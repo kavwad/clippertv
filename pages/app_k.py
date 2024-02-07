@@ -129,7 +129,7 @@ def create_trip_chart(pivot_month):
                         )
 
     trip_chart.update_layout(
-        title_text="K's monthly trips",
+        title_text="Monthly trips",
         xaxis_title='',
         yaxis_title='Number of trips',
         legend_title='',
@@ -145,7 +145,7 @@ def create_cost_chart(pivot_month_cost):
                         )
 
     cost_chart.update_layout(
-        title_text="K's monthly transit cost",
+        title_text="Monthly transit cost",
         xaxis_title='',
         yaxis_title='Cost in $',
         legend_title='',
