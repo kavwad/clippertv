@@ -260,7 +260,7 @@ def main():
             if st.button('Undo'):
                 st.session_state.new_rows = st.session_state.new_rows.iloc[:-1]
 
-        # Show rows to be added
+        # Display new_rows and submit button
         if not st.session_state.new_rows.empty:
             with st.container(border=True):
                 st.markdown(':rotating_light: :red[for K & B use only!] :rotating_light:')
@@ -276,12 +276,12 @@ def main():
                             )
 
                 # Submit button
-                if st.button(':green[Submit all]'):
+                if st.button('Submit all'):
                     df = (pd.concat([df, st.session_state.new_rows]).
                             sort_values('Transaction Date', ascending=False).
                             reset_index)(drop=True)
                     df.to_csv('data_k.csv', index=False)
-                    st.session_state.new_rows = pd.DataFrame()
+                    ':green[Submitted!]'
                     
 if __name__ == "__main__":
     main()
