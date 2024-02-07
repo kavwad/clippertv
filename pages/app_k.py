@@ -169,9 +169,11 @@ def main():
     streamlit_setup()
     
     # Display summary
-    st.markdown(f'Kaveh took {pivot_month.iloc[0].sum()} trips last month, which cost ${pivot_month_cost.iloc[0].sum().round().astype(int)}.')
+    st.markdown(f'Kaveh took **{pivot_month.iloc[0].sum()}** trips last month,\
+                which cost **${pivot_month_cost.iloc[0].sum().round().astype(int)}**.')
     if pivot_month.iloc[0].sum() > pivot_year.iloc[0].sum():
-        st.markdown(f"This year, he's taken {pivot_year.iloc[0].sum()} trips, costing ${pivot_year_cost.iloc[0].sum().round().astype(int)}.")
+        st.markdown(f"This year, he's taken **{pivot_year.iloc[0].sum()}** trips,\
+                    costing **${pivot_year_cost.iloc[0].sum().round().astype(int)}**.")
     
     # Display charts
     st.plotly_chart(trip_chart, use_container_width=True)
