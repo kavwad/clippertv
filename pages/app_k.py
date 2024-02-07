@@ -1,9 +1,11 @@
 from io import BytesIO
 import os
+import json
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from google.oauth2.service_account import Credentials
 from google.cloud import storage
 
 TRIP_TABLE_CATEGORIES = ['Muni Bus', 'Muni Metro', 'BART Entrance', 'Cable Car',
@@ -24,12 +26,11 @@ SUBMIT_CATEGORIES = {'Muni Bus': 'Muni Bus', 'Muni Metro': 'Muni Metro',
                      'Caltrain': 'Caltrain Entrance', 'Ferry': 'Ferry Entrance',
                      'AC Transit': 'AC Transit', 'SamTrans': 'SamTrans'}
 
-GOOGLE_CLOUD_KEY = st.secrets['google_cloud_key']
-
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = st.secrets['google_cloud_key']
-
 def load_data(bucket_name, blob_name):
-    storage_client = storage.Client()
+    gcp_service_account_info = json.loads(st.secrets["gcp_service_account"]["key"])
+    credentials = Credentials.from_service_account_info(gcp_service_account_info)
+    
+    storage_client = storage.Client(credentials=credentials)
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(blob_name)
 
