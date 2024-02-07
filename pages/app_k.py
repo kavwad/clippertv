@@ -215,8 +215,65 @@ def main():
                         use_container_width=True,
                         column_config=column_config)
         
-    with add_trips_tab:
-        st.subheader('Missed connections')
+    st.divider()
 
+    # Display add_trips widget
+    with st.expander('Add trips'):
+        '## Missed connections'
+
+        # Form elements
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            transaction_date = st.date_input('Date:', format='MM/DD/YYYY')
+        with col2:
+            category = st.selectbox('Mode:', options=DISP_CATEGORIES)
+        with col3:
+            rides = st.number_input('Rides:', min_value=1, max_value=10, value=1, step=1)
+
+        # Initialize new_rows in session state
+        if 'new_rows' not in st.session_state:
+            st.session_state.new_rows = pd.DataFrame(columns=['Transaction Date', 'Transaction Type', 'Category'])
+
+        button_col1, button_col2 = st.columns([1,5])
+        
+        # Add rides button
+        with button_col1:
+            if st.button('Add ride(s)'):
+                for i in range(rides):
+                    new_row = pd.DataFrame({
+                        'Transaction Date': [pd.Timestamp(transaction_date)],
+                        'Transaction Type': ['Manual entry'],
+                        'Category': [SUBMIT_CATEGORIES[category]]
+                    })
+                    st.session_state.new_rows = pd.concat([st.session_state.new_rows, new_row])
+        
+        # Undo button
+        with button_col2:
+            if st.button('Undo'):
+                st.session_state.new_rows = st.session_state.new_rows.iloc[:-1]
+
+        # Show rows to be added
+        if not st.session_state.new_rows.empty:
+            with st.container(border=True):
+                st.markdown(':rotating_light: :red[for K & B use only!] :rotating_light:')
+                
+                st.data_editor(st.session_state.new_rows,
+                            column_config={
+                                '_index': None,
+                                'Transaction Date': st.column_config.DateColumn(
+                                    label='Date',
+                                    format='MM/DD/YYYY'),
+                                'Transaction Type': None,
+                                'Category': 'Mode'},
+                            )
+
+                # Submit button
+                if st.button(':green[Submit all]'):
+                    df = (pd.concat([df, st.session_state.new_rows]).
+                            sort_values('Transaction Date', ascending=False).
+                            reset_index)(drop=True)
+                    df.to_csv('data_k.csv', index=False)
+                    st.session_state.new_rows = pd.DataFrame()
+                    
 if __name__ == "__main__":
     main()
