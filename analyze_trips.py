@@ -18,18 +18,22 @@ def load_data():
     return df
 
 def process_data(df):
-    pivot_year, pivot_month = process_trip_data(df)
-    pivot_year_cost, pivot_month_cost = process_cost_data(df)
-    free_xfers = ((df['Transaction Type'] == 'Single-tag fare payment') & (df['Debit'].isna())).sum()
+    pivot_year, pivot_year_base = create_pivot_year(df)
+    pivot_month = create_pivot_month(df)
+    pivot_year_cost = create_pivot_year_cost(pivot_year_base)
+    pivot_month_cost = create_pivot_month_cost(df)
+    free_xfers = ((df['Transaction Type'] == 'Single-tag fare payment') & (df['Debit'].isna())).sum()    
+    # pivot_year, pivot_month = process_trip_data(df)
+    # pivot_year_cost, pivot_month_cost = process_cost_data(df)
     return pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers
 
-def process_trip_data(df):
-    pivot_year = create_pivot_year(df)
+# def process_trip_data(df):
+    pivot_year, pivot_year_base = create_pivot_year(df)
     pivot_month = create_pivot_month(df)
     return pivot_year, pivot_month
 
-def process_cost_data(df):
-    pivot_year_cost = create_pivot_year_cost(df)
+# def process_cost_data(df):
+    pivot_year_cost = create_pivot_year_cost(df, pivot_year_base)
     pivot_month_cost = create_pivot_month_cost(df)
     return pivot_year_cost, pivot_month_cost
 
