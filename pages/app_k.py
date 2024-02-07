@@ -156,7 +156,7 @@ def create_cost_chart(pivot_month_cost):
 
 def streamlit_setup():
     st.set_page_config(page_title="Kaveh’s transit trips", layout='wide')
-    # st.title('Kaveh’s transit trips')
+    st.title('Kaveh’s transit trips')
     # st.sidebar.markdown('# Kaveh')
     # st.sidebar.markdown('# Bree')
 
