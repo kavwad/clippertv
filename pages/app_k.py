@@ -12,6 +12,14 @@ COLOR_MAP = {'Muni Bus': '#BA0C2F', 'Muni Metro': '#FDB813', 'BART': '#0099CC',
              'Cable Car': 'brown', 'Caltrain': '#6C6C6C', 'AC Transit': '#00A55E',
              'Ferry': '#008080', 'SamTrans': '#D3D3D3'}
 
+DISP_CATEGORIES = ['Muni Bus', 'Muni Metro', 'BART', 'Cable Car',
+                   'Caltrain', 'Ferry', 'AC Transit', 'SamTrans']
+
+SUBMIT_CATEGORIES = {'Muni Bus': 'Muni Bus', 'Muni Metro': 'Muni Metro',
+                     'BART': 'BART Entrance', 'Cable Car': 'Cable Car',
+                     'Caltrain': 'Caltrain Entrance', 'Ferry': 'Ferry Entrance',
+                     'AC Transit': 'AC Transit', 'SamTrans': 'SamTrans'}
+
 def load_data():
     df = pd.read_csv('data_k.csv', parse_dates=['Transaction Date'])
     return df
