@@ -162,6 +162,7 @@ def streamlit_setup():
 def main():
     df = load_data()
     pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(df)
+    trip_chart, cost_chart = create_charts(pivot_month, pivot_month_cost)
     
     # Set up the page
     streamlit_setup()
@@ -170,6 +171,10 @@ def main():
     st.markdown(f'Kaveh took {pivot_month.iloc[0].sum()} trips last month, which cost ${pivot_month_cost.iloc[0].sum().round().astype(int)}.')
     if pivot_month.iloc[0].sum() > pivot_year.iloc[0].sum():
         st.markdown(f"This year, he's taken {pivot_year.iloc[0].sum()} trips, costing ${pivot_year_cost.iloc[0].sum().round().astype(int)}.")
+    
+    # Display charts
+    st.plotly_chart(trip_chart, use_container_width=True)
+    st.plotly_chart(cost_chart, use_container_width=True)
     
     # Display tables
     # st.write(pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers)
