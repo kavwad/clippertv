@@ -180,8 +180,9 @@ def main():
     st.plotly_chart(cost_chart, use_container_width=True)
     
     # Display tables
-    cost_column_config = {
-        'Year': st.column_config.NumberColumn(format="%d", width=70),
+    column_config = {
+        'Year': st.column_config.NumberColumn(format="%d", width=75),
+        'Month': st.column_config.DateColumn(format="MMM YYYY", width=75),
         'Muni Bus': st.column_config.NumberColumn(format="$%d"),
         'Muni Metro': st.column_config.NumberColumn(format="$%d"),
         'BART': st.column_config.NumberColumn(format="$%d"),
@@ -195,13 +196,20 @@ def main():
     monthly_tab, annual_tab = st.tabs(['Monthly stats', 'Annual stats'])
 
     with monthly_tab:
-        st.dataframe(pivot_month)
-        st.dataframe(pivot_month_cost, column_config=cost_column_config)
+        st.dataframe(pivot_month,
+                        use_container_width=True,
+                        column_config={'Month': st.column_config.DateColumn(format="MMM YYYY", width=75)})
+        st.dataframe(pivot_month_cost,
+                        use_container_width=True,
+                        column_config=column_config)
     
     with annual_tab:
         st.dataframe(pivot_year,
-                     column_config={'Year': st.column_config.NumberColumn(format="%d", width=70)})
-        st.dataframe(pivot_year_cost, column_config=cost_column_config)  
+                        use_container_width=True,
+                        column_config={'Year': st.column_config.NumberColumn(format="%d", width=75)})
+        st.dataframe(pivot_year_cost,
+                        use_container_width=True,
+                        column_config=column_config)
 
 if __name__ == "__main__":
     main()
