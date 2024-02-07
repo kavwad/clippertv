@@ -165,22 +165,17 @@ def main():
     pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(df)
     
     # Set up the page
-    st.title("Kaveh's transit trips")
-    st.sidebar.markdown("# Kaveh")
-    st.write('Kaveh took',
-             pivot_month.iloc[0].sum(),
-             'trips last month, which cost $',
-             pivot_month_cost.iloc[0].sum().round().astype(int),
-             '.'
-             )
-    st.write('Kaveh has taken',
-             pivot_year.iloc[0].sum(),
-             'trips this year, costing $',
-             pivot_year_cost.iloc[0].sum().round().astype(int),
-             '.'
-             )
+    streamlit_setup()
+    
+    # Display summary
+    st.markdown(f'Kaveh took {pivot_month.iloc[0].sum()} trips last month, which cost ${pivot_month_cost.iloc[0].sum().round().astype(int)}.')
+    if pivot_month.iloc[0].sum() > pivot_year.iloc[0].sum():
+        st.markdown(f"This year, he's taken {pivot_year.iloc[0].sum()} trips, costing ${pivot_year_cost.iloc[0].sum().round().astype(int)}.")
+    
+    # Display tables
     st.write(pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers)
     
+    # Display charts
     trip_chart, cost_chart = create_charts(pivot_month, pivot_month_cost)
     st.plotly_chart(trip_chart)
     st.plotly_chart(cost_chart)
