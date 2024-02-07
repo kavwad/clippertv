@@ -1,1 +1,4 @@
+io
+os
+google.cloud
 plotly
