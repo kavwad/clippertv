@@ -1,6 +1,10 @@
+from io import BytesIO
+import os
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from google.cloud import storage
 
 TRIP_TABLE_CATEGORIES = ['Muni Bus', 'Muni Metro', 'BART Entrance', 'Cable Car',
                          'Caltrain Entrance', 'Ferry Entrance', 'AC Transit', 'SamTrans']
@@ -20,9 +24,20 @@ SUBMIT_CATEGORIES = {'Muni Bus': 'Muni Bus', 'Muni Metro': 'Muni Metro',
                      'Caltrain': 'Caltrain Entrance', 'Ferry': 'Ferry Entrance',
                      'AC Transit': 'AC Transit', 'SamTrans': 'SamTrans'}
 
-def load_data():
-    df = pd.read_csv('data_k.csv', parse_dates=['Transaction Date'])
-    return df
+GOOGLE_CLOUD_KEY = st.secrets['google_cloud_key']
+
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = st.secrets['google_cloud_key']
+
+def load_data(bucket_name, blob_name):
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+
+    data = blob.download_as_bytes()
+    return pd.read_csv(BytesIO(data))
+    
+    # df = pd.read_csv('data_k.csv', parse_dates=['Transaction Date'])
+    # return df
 
 def process_data(df):
     pivot_year = create_pivot_year(df)
@@ -169,7 +184,7 @@ def streamlit_setup():
     # st.sidebar.markdown('# Bree')
 
 def main():
-    df = load_data()
+    df = load_data(st.secrets['bucket_name'], st.secrets['blob_name'])
     pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(df)
     trip_chart, cost_chart = create_charts(pivot_month, pivot_month_cost)
     
