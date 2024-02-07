@@ -225,69 +225,78 @@ def main():
     
     st.divider()
 
-    # Display add_trips widget
+    # Display add trips expander
     with st.expander('Add trips'):
-        '## Missed connections'
-
-        # Form elements
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            transaction_date = st.date_input('Date:', format='MM/DD/YYYY')
-        with col2:
-            category = st.selectbox('Mode:', options=DISP_CATEGORIES)
-        with col3:
-            rides = st.number_input('Rides:', min_value=1, step=1)
-
-        # Initialize new_rows in session state
-        if 'new_rows' not in st.session_state:
-            st.session_state.new_rows = pd.DataFrame(columns=['Transaction Date', 'Transaction Type', 'Category'])
-
-        button_col1, button_col2 = st.columns([1,5])
         
-        # Add rides button
-        with button_col1:
-            if st.button('Add ride(s)'):
-                for i in range(rides):
-                    new_row = pd.DataFrame({
-                        'Transaction Date': [pd.Timestamp(transaction_date)],
-                        'Transaction Type': ['Manual entry'],
-                        'Category': [SUBMIT_CATEGORIES[category]]
-                    })
-                    st.session_state.new_rows = pd.concat([st.session_state.new_rows, new_row])
+        import_tab, manual_tab = st.tabs(['Import from pdf', 'Add manually'])
         
-        # Undo button
-        with button_col2:
-            if st.button('Undo'):
-                st.session_state.new_rows = st.session_state.new_rows.iloc[:-1]
+        with import_tab:
+            pdfs = st.file_uploader('Upload Clipper activity pdf', type='pdf', accept_multiple_files=True)
+            
+            # pass to parser
+            for uploaded_file in pdfs:
+                pass
+        
+        with manual_tab:
+            # Form elements
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                transaction_date = st.date_input('Date:', format='MM/DD/YYYY')
+            with col2:
+                category = st.selectbox('Mode:', options=DISP_CATEGORIES)
+            with col3:
+                rides = st.number_input('Rides:', min_value=1, step=1)
 
-        # Display new_rows and submit button
-        if not st.session_state.new_rows.empty:
-            with st.container(border=True):
-                st.markdown(':rotating_light: :red[for K & B use only!] :rotating_light:')
-                
-                st.data_editor(st.session_state.new_rows,
-                            column_config={
-                                '_index': None,
-                                'Transaction Date': st.column_config.DateColumn(
-                                    label='Date',
-                                    format='MM/DD/YYYY'),
-                                'Transaction Type': None,
-                                'Category': 'Mode'},
-                            )
+            # Initialize new_rows in session state
+            if 'new_rows' not in st.session_state:
+                st.session_state.new_rows = pd.DataFrame(columns=['Transaction Date', 'Transaction Type', 'Category'])
 
-                submit_col1, submit_col2 = st.columns([1,5])
-                
-                with submit_col1:
-                    # Submit button
-                    if st.button('Submit all'):
-                        df = (pd.concat([df, st.session_state.new_rows]).
-                                sort_values('Transaction Date', ascending=False).
-                                reset_index)(drop=True)
-                        df.to_csv('data_k.csv', index=False)
-                        st.rerun()
-                        
-                        with submit_col2:
-                            ':green[✓]'
+            button_col1, button_col2 = st.columns([1,5])
+            
+            # Add rides button
+            with button_col1:
+                if st.button('Add ride(s)'):
+                    for i in range(rides):
+                        new_row = pd.DataFrame({
+                            'Transaction Date': [pd.Timestamp(transaction_date)],
+                            'Transaction Type': ['Manual entry'],
+                            'Category': [SUBMIT_CATEGORIES[category]]
+                        })
+                        st.session_state.new_rows = pd.concat([st.session_state.new_rows, new_row])
+            
+            # Undo button
+            with button_col2:
+                if st.button('Undo'):
+                    st.session_state.new_rows = st.session_state.new_rows.iloc[:-1]
+
+            # Display new_rows and submit button
+            if not st.session_state.new_rows.empty:
+                with st.container(border=True):
+                    st.markdown(':rotating_light: :red[for K & B use only!] :rotating_light:')
+                    
+                    st.data_editor(st.session_state.new_rows,
+                                column_config={
+                                    '_index': None,
+                                    'Transaction Date': st.column_config.DateColumn(
+                                        label='Date',
+                                        format='MM/DD/YYYY'),
+                                    'Transaction Type': None,
+                                    'Category': 'Mode'},
+                                )
+
+                    submit_col1, submit_col2 = st.columns([1,5])
+                    
+                    with submit_col1:
+                        # Submit button
+                        if st.button('Submit all'):
+                            df = (pd.concat([df, st.session_state.new_rows]).
+                                    sort_values('Transaction Date', ascending=False).
+                                    reset_index)(drop=True)
+                            df.to_csv('data_k.csv', index=False)
+                            st.rerun()
+                            
+                            with submit_col2:
+                                ':green[✓]'
                     
 if __name__ == "__main__":
     main()
