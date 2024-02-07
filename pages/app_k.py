@@ -155,7 +155,7 @@ def create_cost_chart(pivot_month_cost):
     return cost_chart
 
 def streamlit_setup():
-    st.set_page_config(page_title="Kaveh’s transit trips", layout='wide')
+    st.set_page_config(page_title="Kaveh’s transit trips")
     st.title('Kaveh’s transit trips', anchor=False)
     # st.sidebar.markdown('# Kaveh')
     # st.sidebar.markdown('# Bree')
@@ -179,7 +179,8 @@ def main():
     st.plotly_chart(trip_chart, use_container_width=True)
     st.plotly_chart(cost_chart, use_container_width=True)
     
-    # Display tables
+    # Set up tabs and tables
+    monthly_tab, annual_tab = st.tabs(['Monthly stats', 'Annual stats'])
     column_config = {
         'Year': st.column_config.NumberColumn(format="%d", width=75),
         'Month': st.column_config.DateColumn(format="MMM YYYY", width=75),
@@ -193,8 +194,7 @@ def main():
         'SamTrans': st.column_config.NumberColumn(format="$%d"),
         }
 
-    monthly_tab, annual_tab, add_trips_tab = st.tabs(['Monthly stats', 'Annual stats', 'Add trips'])
-
+    # Display tables
     with monthly_tab:
         st.subheader('Monthly trips by mode', anchor=False)
         st.dataframe(pivot_month,
@@ -214,7 +214,7 @@ def main():
         st.dataframe(pivot_year_cost,
                         use_container_width=True,
                         column_config=column_config)
-        
+    
     st.divider()
 
     # Display add_trips widget
