@@ -191,17 +191,16 @@ def main():
         'SamTrans': st.column_config.NumberColumn(format="$%d"),
         }
 
-    st.dataframe(pivot_year, use_container_width=True,
-                 column_config={'Year': st.column_config.NumberColumn(format="%d", width=70)})
-    st.dataframe(pivot_month, use_container_width=True)
+    monthly_tab, annual_tab = st.tabs(['Monthly stats', 'Annual stats'])
+
+    with monthly_tab:
+        st.dataframe(pivot_month)
+        st.dataframe(pivot_month_cost, column_config=cost_column_config)
     
-    st.dataframe(pivot_year_cost, use_container_width=True, column_config=cost_column_config)
-    st.dataframe(pivot_month_cost, use_container_width=True, column_config=cost_column_config)
-    
-    # Display charts
-    trip_chart, cost_chart = create_charts(pivot_month, pivot_month_cost)
-    st.plotly_chart(trip_chart)
-    st.plotly_chart(cost_chart)
+    with annual_tab:
+        st.dataframe(pivot_year,
+                     column_config={'Year': st.column_config.NumberColumn(format="%d", width=70)})
+        st.dataframe(pivot_year_cost, column_config=cost_column_config)  
 
 if __name__ == "__main__":
     main()
