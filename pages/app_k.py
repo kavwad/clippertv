@@ -156,7 +156,7 @@ def create_cost_chart(pivot_month_cost):
 
 def streamlit_setup():
     st.set_page_config(page_title="Kaveh’s transit trips", layout='wide')
-    st.title('Kaveh’s transit trips')
+    st.title('Kaveh’s transit trips', anchor=False)
     # st.sidebar.markdown('# Kaveh')
     # st.sidebar.markdown('# Bree')
 
@@ -193,23 +193,30 @@ def main():
         'SamTrans': st.column_config.NumberColumn(format="$%d"),
         }
 
-    monthly_tab, annual_tab = st.tabs(['Monthly stats', 'Annual stats'])
+    monthly_tab, annual_tab, add_trips_tab = st.tabs(['Monthly stats', 'Annual stats', 'Add trips'])
 
     with monthly_tab:
+        st.subheader('Monthly trips by mode', anchor=False)
         st.dataframe(pivot_month,
                         use_container_width=True,
                         column_config={'Month': st.column_config.DateColumn(format="MMM YYYY", width=75)})
+        st.subheader('Monthly trip cost by mode', anchor=False)
         st.dataframe(pivot_month_cost,
                         use_container_width=True,
                         column_config=column_config)
     
     with annual_tab:
+        st.subheader('Annual trips by mode', anchor=False)
         st.dataframe(pivot_year,
                         use_container_width=True,
                         column_config={'Year': st.column_config.NumberColumn(format="%d", width=75)})
+        st.subheader('Annual trip cost by mode', anchor=False)
         st.dataframe(pivot_year_cost,
                         use_container_width=True,
                         column_config=column_config)
+        
+    with add_trips_tab:
+        st.subheader('Missed connections')
 
 if __name__ == "__main__":
     main()
