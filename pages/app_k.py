@@ -236,7 +236,7 @@ def main():
         with col2:
             category = st.selectbox('Mode:', options=DISP_CATEGORIES)
         with col3:
-            rides = st.number_input('Rides:', min_value=1, max_value=10, value=1, step=1)
+            rides = st.number_input('Rides:', min_value=1, step=1)
 
         # Initialize new_rows in session state
         if 'new_rows' not in st.session_state:
@@ -275,13 +275,19 @@ def main():
                                 'Category': 'Mode'},
                             )
 
-                # Submit button
-                if st.button('Submit all'):
-                    df = (pd.concat([df, st.session_state.new_rows]).
-                            sort_values('Transaction Date', ascending=False).
-                            reset_index)(drop=True)
-                    df.to_csv('data_k.csv', index=False)
-                    ':green[Submitted!]'
+                submit_col1, submit_col2 = st.columns([1,5])
+                
+                with submit_col1:
+                    # Submit button
+                    if st.button('Submit all'):
+                        df = (pd.concat([df, st.session_state.new_rows]).
+                                sort_values('Transaction Date', ascending=False).
+                                reset_index)(drop=True)
+                        df.to_csv('data_k.csv', index=False)
+                        st.rerun()
+                        
+                        with submit_col2:
+                            ':green[✓]'
                     
 if __name__ == "__main__":
     main()
