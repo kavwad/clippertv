@@ -18,24 +18,12 @@ def load_data():
     return df
 
 def process_data(df):
-    pivot_year, pivot_year_base = create_pivot_year(df)
+    pivot_year = create_pivot_year(df)
     pivot_month = create_pivot_month(df)
-    pivot_year_cost = create_pivot_year_cost(pivot_year_base)
+    pivot_year_cost = create_pivot_year_cost(df)
     pivot_month_cost = create_pivot_month_cost(df)
     free_xfers = ((df['Transaction Type'] == 'Single-tag fare payment') & (df['Debit'].isna())).sum()    
-    # pivot_year, pivot_month = process_trip_data(df)
-    # pivot_year_cost, pivot_month_cost = process_cost_data(df)
     return pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers
-
-# def process_trip_data(df):
-    pivot_year, pivot_year_base = create_pivot_year(df)
-    pivot_month = create_pivot_month(df)
-    return pivot_year, pivot_month
-
-# def process_cost_data(df):
-    pivot_year_cost = create_pivot_year_cost(df, pivot_year_base)
-    pivot_month_cost = create_pivot_month_cost(df)
-    return pivot_year_cost, pivot_month_cost
 
 def create_pivot_year(df):
     pivot_year = (df.pivot_table(index=df['Transaction Date'].dt.year,
@@ -170,7 +158,24 @@ def create_cost_chart(pivot_month_cost):
 def main():
     df = load_data()
     pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(df)
+    
+    # Set up the page
+    st.title("Kaveh's transit trips")
+    st.sidebar.markdown("# Kaveh")
+    st.write('Kaveh took',
+             pivot_month.iloc[0].sum(),
+             'trips last month, which cost $',
+             pivot_month_cost.iloc[0].sum().round().astype(int),
+             '.'
+             )
+    st.write('Kaveh has taken',
+             pivot_year.iloc[0].sum(),
+             'trips this year, costing $',
+             pivot_year_cost.iloc[0].sum().round().astype(int),
+             '.'
+             )
     st.write(pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers)
+    
     trip_chart, cost_chart = create_charts(pivot_month, pivot_month_cost)
     st.plotly_chart(trip_chart)
     st.plotly_chart(cost_chart)
