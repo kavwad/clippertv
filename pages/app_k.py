@@ -14,7 +14,6 @@ COLOR_MAP = {'Muni Bus': '#BA0C2F', 'Muni Metro': '#FDB813', 'BART': '#0099CC',
 
 def load_data():
     df = pd.read_csv('data_k.csv', parse_dates=['Transaction Date'])
-    pd.options.display.float_format = "{:.2f}".format
     return df
 
 def process_data(df):
@@ -22,7 +21,7 @@ def process_data(df):
     pivot_month = create_pivot_month(df)
     pivot_year_cost = create_pivot_year_cost(df)
     pivot_month_cost = create_pivot_month_cost(df)
-    free_xfers = ((df['Transaction Type'] == 'Single-tag fare payment') & (df['Debit'].isna())).sum()    
+    free_xfers = ((df['Transaction Type'] == 'Single-tag fare payment') & (df['Debit'].isna())).sum()
     return pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers
 
 def create_pivot_year(df):
@@ -156,8 +155,8 @@ def create_cost_chart(pivot_month_cost):
     return cost_chart
 
 def streamlit_setup():
-    st.set_page_config(page_title='Kaveh', layout='wide')
-    st.title("Kaveh's transit trips")
+    st.set_page_config(page_title="Kaveh’s transit trips")
+    st.title("Kaveh’s transit trips")
     st.sidebar.markdown("# Kaveh")
 
 def main():
@@ -173,7 +172,26 @@ def main():
         st.markdown(f"This year, he's taken {pivot_year.iloc[0].sum()} trips, costing ${pivot_year_cost.iloc[0].sum().round().astype(int)}.")
     
     # Display tables
-    st.write(pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers)
+    # st.write(pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers)
+
+    cost_column_config = {
+        'Year': st.column_config.NumberColumn(format="%d", width=70),
+        'Muni Bus': st.column_config.NumberColumn(format="$%d"),
+        'Muni Metro': st.column_config.NumberColumn(format="$%d"),
+        'BART': st.column_config.NumberColumn(format="$%d"),
+        'Cable Car': st.column_config.NumberColumn(format="$%d"),
+        'Caltrain': st.column_config.NumberColumn(format="$%d"),
+        'Ferry': st.column_config.NumberColumn(format="$%d"),
+        'AC Transit': st.column_config.NumberColumn(format="$%d"),
+        'SamTrans': st.column_config.NumberColumn(format="$%d"),
+        }
+
+    st.dataframe(pivot_year, use_container_width=True,
+                 column_config={'Year': st.column_config.NumberColumn(format="%d", width=70)})
+    st.dataframe(pivot_month, use_container_width=True)
+    
+    st.dataframe(pivot_year_cost, use_container_width=True, column_config=cost_column_config)
+    st.dataframe(pivot_month_cost, use_container_width=True, column_config=cost_column_config)
     
     # Display charts
     trip_chart, cost_chart = create_charts(pivot_month, pivot_month_cost)
