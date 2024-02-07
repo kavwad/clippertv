@@ -178,8 +178,6 @@ def main():
     st.plotly_chart(cost_chart, use_container_width=True)
     
     # Display tables
-    # st.write(pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers)
-
     cost_column_config = {
         'Year': st.column_config.NumberColumn(format="%d", width=70),
         'Muni Bus': st.column_config.NumberColumn(format="$%d"),
