@@ -155,6 +155,11 @@ def create_cost_chart(pivot_month_cost):
     cost_chart.update_traces(hovertemplate= '<b>%{x|%B %Y}</b>: $%{y}')
     return cost_chart
 
+def streamlit_setup():
+    st.set_page_config(page_title='Kaveh', layout='wide')
+    st.title("Kaveh's transit trips")
+    st.sidebar.markdown("# Kaveh")
+
 def main():
     df = load_data()
     pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(df)
