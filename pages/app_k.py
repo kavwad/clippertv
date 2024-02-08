@@ -35,7 +35,7 @@ cost_diff_text = "more" if cost_diff >= 0 else "less"
 
 # Create formatted strings
 f"#### You took **:red[{trips_this_month}]** trips in\
-    {pivot_month.index[0].strftime('%B')},\which cost\
+    {pivot_month.index[0].strftime('%B')}, which cost\
     **:red[\${cost_this_month}]**."
 f"You rode **{pivot_month.iloc[0].idxmax()}** most, at\
     **{pivot_month.iloc[0][pivot_month.iloc[0].idxmax()]}** times.\
