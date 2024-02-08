@@ -10,8 +10,8 @@ COST_TABLE_CATEGORIES = ['Muni Bus', 'Muni Metro', 'BART Exit', 'Cable Car',
                          'Caltrain', 'Ferry', 'AC Transit', 'SamTrans']
 
 COLOR_MAP = {'Muni Bus': '#BA0C2F', 'Muni Metro': '#FDB813', 'BART': '#0099CC',
-             'Cable Car': 'brown', 'Caltrain': '#6C6C6C', 'AC Transit': '#00A55E',
-             'Ferry': '#008080', 'SamTrans': '#D3D3D3'}
+             'Cable Car': '#8B4513', 'Caltrain': '#6C6C6C', 'AC Transit': '#00A55E',
+             'Ferry': '#4DD0E1', 'SamTrans': '#D3D3D3'}
 
 DISP_CATEGORIES = ['Muni Bus', 'Muni Metro', 'BART', 'Cable Car',
                    'Caltrain', 'Ferry', 'AC Transit', 'SamTrans']
@@ -54,7 +54,7 @@ def create_pivot_year(df):
     return pivot_year
 
 def create_pivot_month(df):
-    pivot_month = (df.groupby([pd.Grouper(key='Transaction Date', freq='ME'), 'Category'])
+    pivot_month = (df.groupby([pd.Grouper(key='Transaction Date', freq='M'), 'Category'])
                 .size()
                 .unstack(fill_value=0)
                 )
@@ -101,7 +101,7 @@ def create_pivot_year_cost(df):
 
 def create_pivot_month_cost(df):
     # Create pivot table by month and category
-    pivot_month_cost = (df.groupby([pd.Grouper(key='Transaction Date', freq='ME'), 'Category'])[['Debit', 'Credit']]
+    pivot_month_cost = (df.groupby([pd.Grouper(key='Transaction Date', freq='M'), 'Category'])[['Debit', 'Credit']]
                     .sum()
                     .unstack(fill_value=0)
                     )
@@ -181,18 +181,30 @@ def main():
     trip_chart, cost_chart = create_charts(pivot_month, pivot_month_cost)
     
     # Display summary
-    st.markdown(f'Kaveh took **{pivot_month.iloc[0].sum()}** trips last month,\
-                which cost **${pivot_month_cost.iloc[0].sum().round().astype(int)}**.')
+    trips_this_month = pivot_month.iloc[0].sum()
+    cost_this_month = pivot_month_cost.iloc[0].sum().round().astype(int)
+    
+    trip_diff = pivot_month.iloc[1].sum() - pivot_month.iloc[0].sum()
+    trip_diff_text = "more" if trip_diff >= 0 else "fewer"
+    cost_diff = (pivot_month_cost.iloc[1].sum() - pivot_month_cost.iloc[0].sum()).round().astype(int)
+    cost_diff_text = "more" if cost_diff >= 0 else "less"
+
+    # Create formatted strings
+    f"#### You took **:red[{trips_this_month}]** trips in {pivot_month.index[0].strftime('%B')}, which cost **:red[\${cost_this_month}]**."
+    f"That's {abs(trip_diff)} {trip_diff_text} transit trips and ${abs(cost_diff)} {cost_diff_text} than the previous month.\
+        The majority of those—**{pivot_month.iloc[0][pivot_month.iloc[0].idxmax()]}**—were on **{pivot_month.iloc[0].idxmax()}**."
+    f"Since 2021, you've gotten **{free_xfers}** free transfers!"
+    
     if pivot_month.iloc[0].sum() > pivot_year.iloc[0].sum():
-        st.markdown(f"This year, he's taken **{pivot_year.iloc[0].sum()}** trips,\
-                    costing **${pivot_year_cost.iloc[0].sum().round().astype(int)}**.")
+        f"This year, he's taken **{pivot_year.iloc[0].sum()}** trips,\
+            costing **${pivot_year_cost.iloc[0].sum().round().astype(int)}**."
     
     # Display charts
     st.plotly_chart(trip_chart, use_container_width=True)
     st.plotly_chart(cost_chart, use_container_width=True)
     
     # Set up tabs and tables
-    monthly_tab, annual_tab = st.tabs(['Monthly stats', 'Annual stats'])
+    annual_tab, monthly_tab = st.tabs(['Annual stats', 'Monthly stats'])
     column_config = {
         'Year': st.column_config.NumberColumn(format="%d", width=75),
         'Month': st.column_config.DateColumn(format="MMM YYYY", width=75),
