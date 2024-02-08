@@ -1,3 +1,4 @@
+import json
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -22,9 +23,9 @@ SUBMIT_CATEGORIES = {'Muni Bus': 'Muni Bus', 'Muni Metro': 'Muni Metro',
                      'AC Transit': 'AC Transit', 'SamTrans': 'SamTrans'}
 
 def load_data():
-    conn = st.connection('gcs', type=FilesConnection)
-    df = conn.read("clippertv_data/data_k.csv", input_format="csv", ttl=600)
-    df['Transaction Date'] = pd.to_datetime(df['Transaction Date'])
+    df = pd.read_csv('gcs://clippertv_data/data_k.csv',
+                     parse_dates=['Transaction Date'],
+                     storage_options={'token': json.loads(st.secrets['gcs_key'])})
     return df
 
 def process_data(df):
@@ -191,8 +192,8 @@ def main():
 
     # Create formatted strings
     f"#### You took **:red[{trips_this_month}]** trips in {pivot_month.index[0].strftime('%B')}, which cost **:red[\${cost_this_month}]**."
-    f"That's {abs(trip_diff)} {trip_diff_text} transit trips and ${abs(cost_diff)} {cost_diff_text} than the previous month.\
-        The majority of those—**{pivot_month.iloc[0][pivot_month.iloc[0].idxmax()]}**—were on **{pivot_month.iloc[0].idxmax()}**."
+    f"You rode **{pivot_month.iloc[0].idxmax()}** most, at **{pivot_month.iloc[0][pivot_month.iloc[0].idxmax()]}** times.\
+        Altogether, you took {abs(trip_diff)} {trip_diff_text} trips and paid ${abs(cost_diff)} {cost_diff_text} than the previous month."
     f"Since 2021, you've gotten **{free_xfers}** free transfers!"
     
     if pivot_month.iloc[0].sum() > pivot_year.iloc[0].sum():
@@ -300,19 +301,21 @@ def main():
                                     'Category': 'Mode'},
                                 )
 
-                    submit_col1, submit_col2 = st.columns([1,5])
-                    
-                    with submit_col1:
-                        # Submit button
-                        if st.button('Submit all'):
-                            df = (pd.concat([df, st.session_state.new_rows]).
-                                    sort_values('Transaction Date', ascending=False).
-                                    reset_index)(drop=True)
-                            df.to_csv('gs://clippertv_data/data_k.csv', index=False)
-                            st.rerun()
+                    # Submit button
+                    if st.button('Submit all'):
+                        df = (pd.concat([df, st.session_state.new_rows]).
+                                sort_values('Transaction Date', ascending=False).
+                                reset_index)(drop=True)
+                        
+                        df.to_csv('gcs://clippertv_data/data_k.csv',
+                                    index=False,
+                                    storage_options={'token':
+                                                    json.loads(st.secrets['gcs_key'])})
+
+                        st.session_state.new_rows = pd.DataFrame(columns=['Transaction Date', 'Transaction Type', 'Category'])
+                        
+                        st.rerun()
                             
-                            with submit_col2:
-                                ':green[✓]'
                     
 if __name__ == "__main__":
     main()
