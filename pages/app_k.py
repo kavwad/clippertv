@@ -26,8 +26,8 @@ SUBMIT_CATEGORIES = {'Muni Bus': 'Muni Bus', 'Muni Metro': 'Muni Metro',
 def load_data():
     # df = pd.read_csv('data_k.csv', parse_dates=['Transaction Date'])
     conn = st.connection('gcs', type=FilesConnection)
-    csv = conn.read("clippertv_data/data_k.csv", input_format="csv", ttl=600)
-    df = pd.read_csv(BytesIO(csv), parse_dates=['Transaction Date'])
+    df = conn.read("clippertv_data/data_k.csv", input_format="csv", ttl=600)
+    # df = pd.read_csv(BytesIO(csv), parse_dates=['Transaction Date'])
     return df
 
 # def process_data(df):
