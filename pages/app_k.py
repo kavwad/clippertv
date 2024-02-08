@@ -2,7 +2,6 @@ import json
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-from st_files_connection import FilesConnection
 
 TRIP_TABLE_CATEGORIES = ['Muni Bus', 'Muni Metro', 'BART Entrance', 'Cable Car',
                          'Caltrain Entrance', 'Ferry Entrance', 'AC Transit', 'SamTrans']
