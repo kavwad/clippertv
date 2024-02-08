@@ -1,5 +1,3 @@
-from io import BytesIO
-
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -298,7 +296,7 @@ def main():
                             df = (pd.concat([df, st.session_state.new_rows]).
                                     sort_values('Transaction Date', ascending=False).
                                     reset_index)(drop=True)
-                            df.to_csv('data_k.csv', index=False)
+                            df.to_csv('gs://clippertv_data/data_k.csv', index=False)
                             st.rerun()
                             
                             with submit_col2:
