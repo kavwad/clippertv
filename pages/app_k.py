@@ -1,8 +1,8 @@
-import json
 import pandas as pd
 import streamlit as st
 
 from analyze_trips import create_charts, load_data, process_data
+from import_pdf import get_trips, categorize, clean_up, check_category, add_trips_to_database, save_to_gcs
 
 DISP_CATEGORIES = ['Muni Bus', 'Muni Metro', 'BART', 'Cable Car',
                    'Caltrain', 'Ferry', 'AC Transit', 'SamTrans']
@@ -103,9 +103,18 @@ with st.expander('Add trips'):
                                 type='pdf',
                                 accept_multiple_files=True)
         
-        # pass to parser
-        for uploaded_file in pdfs:
-            pass
+        if pdfs: # submit appears only after upload
+            for pdf in pdfs:
+                df_import = categorize(clean_up(get_trips(pdf.name)))
+                check_category(df_import)
+                st.write(pdf.name, ':', df_import)
+            if st.button('Upload all'):
+                for pdf in pdfs:
+                    df = add_trips_to_database(df, df_import)
+                if not df_import.empty:
+                    st.write(df.sort_values('Transaction Date', ascending=False).reset_index(drop=True))
+                    # save_to_gcs(df)
+                    f':green[Uploaded len(df_import) rides!]'
     
     with manual_tab:
         # Form elements
@@ -162,10 +171,7 @@ with st.expander('Add trips'):
                             sort_values('Transaction Date', ascending=False).
                             reset_index)(drop=True)
                     
-                    df.to_csv('gcs://clippertv_data/data_k.csv',
-                                index=False,
-                                storage_options={'token':
-                                                json.loads(st.secrets['gcs_key'])})
+                    save_to_gcs(df)
 
                     st.session_state.new_rows = pd.DataFrame(columns=['Transaction Date',
                                                                       'Transaction Type',
