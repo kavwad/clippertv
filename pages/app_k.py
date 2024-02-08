@@ -1,5 +1,4 @@
 from io import BytesIO
-import json
 
 import pandas as pd
 import plotly.express as px
@@ -24,9 +23,9 @@ SUBMIT_CATEGORIES = {'Muni Bus': 'Muni Bus', 'Muni Metro': 'Muni Metro',
                      'Caltrain': 'Caltrain Entrance', 'Ferry': 'Ferry Entrance',
                      'AC Transit': 'AC Transit', 'SamTrans': 'SamTrans'}
 
-def load_data(bucket_name, blob_name):
+def load_data():
     conn = st.connection('gcs', type=FilesConnection)
-    df = conn.read("streamlit-bucket/myfile.csv", input_format="csv", ttl=600)
+    df = conn.read("clippertv_data/data_k.csv", input_format="csv", ttl=600)
     # df = pd.read_csv('data_k.csv', parse_dates=['Transaction Date'])
     return df
 
