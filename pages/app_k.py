@@ -176,6 +176,7 @@ def load_data():
 
 def main():
     df = load_data()
+    df
 #     pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(df)
 #     trip_chart, cost_chart = create_charts(pivot_month, pivot_month_cost)
     
