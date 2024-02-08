@@ -54,7 +54,7 @@ def create_pivot_year(df):
     return pivot_year
 
 def create_pivot_month(df):
-    pivot_month = (df.groupby([pd.Grouper(key='Transaction Date', freq='M'), 'Category'])
+    pivot_month = (df.groupby([pd.Grouper(key='Transaction Date', freq='ME'), 'Category'])
                 .size()
                 .unstack(fill_value=0)
                 )
@@ -101,7 +101,7 @@ def create_pivot_year_cost(df):
 
 def create_pivot_month_cost(df):
     # Create pivot table by month and category
-    pivot_month_cost = (df.groupby([pd.Grouper(key='Transaction Date', freq='M'), 'Category'])[['Debit', 'Credit']]
+    pivot_month_cost = (df.groupby([pd.Grouper(key='Transaction Date', freq='ME'), 'Category'])[['Debit', 'Credit']]
                     .sum()
                     .unstack(fill_value=0)
                     )
