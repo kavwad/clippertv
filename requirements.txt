@@ -5,4 +5,3 @@ ghostscript
 plotly
 PyPDF2
 st-files-connection
-# tk
