@@ -1,7 +1,7 @@
 camelot-py[base]
 gcsfs
-opencv-python-headless
 ghostscript
+opencv-python-headless
 plotly
 PyPDF2
 st-files-connection
