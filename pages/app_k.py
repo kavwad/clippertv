@@ -93,18 +93,6 @@ with monthly_tab:
                     use_container_width=True,
                     column_config=column_config)
 
-with annual_tab:
-    st.subheader('Annual trips by mode', anchor=False)
-    st.dataframe(pivot_year,
-                    use_container_width=True,
-                    column_config={'Year':
-                                   st.column_config.NumberColumn(format="%d",
-                                                                 width=75)})
-    st.subheader('Annual trip cost by mode', anchor=False)
-    st.dataframe(pivot_year_cost,
-                    use_container_width=True,
-                    column_config=column_config)
-
 st.divider()
 
 # Display add trips expander
