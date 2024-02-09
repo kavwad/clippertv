@@ -1,5 +1,8 @@
-camelot-py
+camelot-py[base]
 gcsfs
+opencv-python
+ghostscript
 plotly
+python3-tk
 PyPDF2
 st-files-connection
