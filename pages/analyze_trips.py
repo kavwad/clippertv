@@ -129,7 +129,7 @@ def create_pivot_month_cost(df):
     return pivot_month_cost
 
 def create_trip_chart(pivot_month):
-    pivot_month.index = pd.to_datetime(pivot_month.index)
+    pivot_month.index = pd.to_datetime(pivot_month.index, format='%b %Y')
     trip_chart = px.bar(pivot_month,
                         color_discrete_map=COLOR_MAP,
                         )
@@ -145,7 +145,7 @@ def create_trip_chart(pivot_month):
     return trip_chart
 
 def create_cost_chart(pivot_month_cost):
-    pivot_month_cost.index = pd.to_datetime(pivot_month_cost.index)
+    pivot_month_cost.index = pd.to_datetime(pivot_month_cost.index, format='%b %Y')
     cost_chart = px.bar(pivot_month_cost,
                         color_discrete_map=COLOR_MAP,
                         )
