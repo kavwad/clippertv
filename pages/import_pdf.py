@@ -6,42 +6,25 @@ import sys
 import camelot
 import numpy as np
 import pandas as pd
-import PyPDF2
 import streamlit as st
 
 from analyze_trips import load_data
 
-def get_trips(filename):
-    # read first page
+def read_pdf_section(filename, pages, table_areas):
     tables = camelot.read_pdf(filename,
-                 pages='1',
-                 flavor='stream',
-                 table_areas=['0,500,800,100'])
+                            pages=pages,
+                            flavor='stream',
+                            table_areas=table_areas)
+    # [camelot.plot(tables[table], kind='contour').show() for table in tables] # to check table_areas 
+    dfs = [table.df for table in tables]
+    for df in dfs:
+        df.columns = df.iloc[0].str.title()
+        df.drop(df.index[0], inplace=True)
+    return pd.concat(dfs) if tables else None
 
-    df_import = tables[0].df
-    df_import.columns = df_import.iloc[0].str.title()
-    df_import = df_import[1:]
-    
-    # check if more than one page
-    with open(filename, 'rb') as file:
-        reader = PyPDF2.PdfFileReader(file)
-        pages = reader.numPages
-
-    # read next pages if they exist
-    if pages > 1:
-        tables = camelot.read_pdf(filename,
-                                pages='2-end',
-                                flavor='stream',
-                                table_areas=['0,560,800,90'])
-
-        for i in range(len(tables)):
-            next_page = tables[i].df
-            next_page.columns = next_page.iloc[0].str.title()
-            next_page = next_page[1:]
-            df_import = pd.concat([df_import, next_page])
-            # camelot.plot(tables[i], kind='contour').show() # to check table_areas 
-
-    # clean up
+def get_trips(filename):
+    df_import = read_pdf_section(filename, '1', ['0,500,800,100']) # first page
+    df_import = pd.concat([df_import, read_pdf_section(filename, '2-end', ['0,560,800,90'])])
     return df_import.reset_index(drop=True).replace('', np.nan)
 
 def categorize(df_import):
