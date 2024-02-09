@@ -1,6 +1,6 @@
 camelot-py[base]
 gcsfs
-opencv-python
+opencv-python-headless
 ghostscript
 plotly
 PyPDF2
