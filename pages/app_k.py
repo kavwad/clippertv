@@ -44,7 +44,7 @@ def upload_pdf(pdf, filename):
     ssh.close()
 
 # Set up the page
-st.set_page_config(page_title="Kaveh’s transit trips")
+st.set_page_config(page_title="Kaveh’s transit trips", layout='wide')
 st.title('Kaveh’s transit trips', anchor=False)
 # st.sidebar.markdown('# Kaveh')
 # st.sidebar.markdown('# Bree')
