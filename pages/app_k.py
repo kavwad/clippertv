@@ -116,7 +116,7 @@ with monthly_tab:
     st.subheader('Monthly trip cost by mode', anchor=False)
     st.dataframe(pivot_month_cost,
                     use_container_width=True,
-                    column_config=column_config)
+                    column_config=COLUMN_CONFIG)
 
 st.divider()
 
