@@ -104,7 +104,7 @@ with annual_tab:
     st.subheader('Annual trip cost by mode', anchor=False)
     st.dataframe(pivot_year_cost,
                     use_container_width=True,
-                    column_config=column_config)
+                    column_config=COLUMN_CONFIG)
 
 with monthly_tab:
     st.subheader('Monthly trips by mode', anchor=False)
