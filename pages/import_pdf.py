@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 
+from io import BytesIO
 import json
 import sys
 
 import camelot
 import numpy as np
 import pandas as pd
+import paramiko
 import streamlit as st
 
 from analyze_trips import load_data
+
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
 def read_pdf_section(filename, pages, table_areas):
     tables = camelot.read_pdf(filename,
@@ -65,6 +70,16 @@ def clean_up(df_import):
 def add_trips_to_database(df, df_import):
     df = pd.concat([df, df_import]).sort_values('Transaction Date', ascending=False).reset_index(drop=True)
     return df
+    
+def upload_pdf(pdf, filename):
+    ssh.connect(hostname=st.secrets['connections']['ccrma']['hostname'],
+                username=st.secrets['connections']['ccrma']['username'],
+                password=st.secrets['connections']['ccrma']['password'])
+    sftp = ssh.open_sftp()
+    sftp.putfo(BytesIO(pdf.read()), st.secrets['connections']['ccrma']['filepath']
+               + filename)
+    sftp.close()
+    ssh.close()
     
 def save_to_gcs(df):
     df.to_csv('gcs://clippertv_data/data_k.csv',

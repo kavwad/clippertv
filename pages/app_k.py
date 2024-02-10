@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 
 import datetime
-from io import BytesIO
 import pandas as pd
-import paramiko
 import streamlit as st
 import time
 
 from analyze_trips import create_charts, load_data, process_data
 from import_pdf import get_trips, categorize, clean_up, check_category, add_trips_to_database, save_to_gcs
+from pages.import_pdf import upload_pdf
 
 DISP_CATEGORIES = ['Muni Bus', 'Muni Metro', 'BART', 'Cable Car',
                    'Caltrain', 'Ferry', 'AC Transit', 'SamTrans']
@@ -29,19 +28,6 @@ COLUMN_CONFIG = {'Year': st.column_config.NumberColumn(format="%d", width=75),
                  'AC Transit': st.column_config.NumberColumn(format="$%d"),
                  'SamTrans': st.column_config.NumberColumn(format="$%d"),
                  }
-
-ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-def upload_pdf(pdf, filename):
-    ssh.connect(hostname=st.secrets['connections']['ccrma']['hostname'],
-                username=st.secrets['connections']['ccrma']['username'],
-                password=st.secrets['connections']['ccrma']['password'])
-    sftp = ssh.open_sftp()
-    sftp.putfo(BytesIO(pdf.read()), st.secrets['connections']['ccrma']['filepath']
-               + filename)
-    sftp.close()
-    ssh.close()
 
 # Set up the page
 st.set_page_config(page_title="Kaveh’s transit trips", layout='wide')
