@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 
+import datetime
+from io import BytesIO
 import pandas as pd
+import paramiko
 import streamlit as st
+import time
 
 from analyze_trips import create_charts, load_data, process_data
 from import_pdf import get_trips, categorize, clean_up, check_category, add_trips_to_database, save_to_gcs
@@ -30,11 +34,11 @@ ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
 def upload_pdf(pdf, filename):
-    ssh.connect(hostname=st.secrets['connections']['ssh']['hostname'],
-                username=st.secrets['connections']['ssh']['username'],
-                password=st.secrets['connections']['ssh']['password'])
+    ssh.connect(hostname=st.secrets['connections']['ccrma']['hostname'],
+                username=st.secrets['connections']['ccrma']['username'],
+                password=st.secrets['connections']['ccrma']['password'])
     sftp = ssh.open_sftp()
-    sftp.putfo(BytesIO(pdf.read()), st.secrets['connections']['ssh']['filepath']
+    sftp.putfo(BytesIO(pdf.read()), st.secrets['connections']['ccrma']['filepath']
                + filename)
     sftp.close()
     ssh.close()
@@ -55,10 +59,10 @@ trips_this_month = pivot_month.iloc[0].sum()
 cost_this_month = pivot_month_cost.iloc[0].sum().round().astype(int)
 
 trip_diff = pivot_month.iloc[1].sum() - pivot_month.iloc[0].sum()
-trip_diff_text = "more" if trip_diff >= 0 else "fewer"
+trip_diff_text = "fewer" if trip_diff >= 0 else "more"
 cost_diff = (pivot_month_cost.iloc[1].sum()
              - pivot_month_cost.iloc[0].sum()).round().astype(int)
-cost_diff_text = "more" if cost_diff >= 0 else "less"
+cost_diff_text = "less" if cost_diff >= 0 else "more"
 
 # Create formatted strings
 f"#### You took **:red[{trips_this_month}]** trips in\
@@ -80,18 +84,6 @@ st.plotly_chart(cost_chart, use_container_width=True)
 
 # Set up tabs and tables
 annual_tab, monthly_tab = st.tabs(['Annual stats', 'Monthly stats'])
-column_config = {
-    'Year': st.column_config.NumberColumn(format="%d", width=75),
-    'Month': st.column_config.DateColumn(format="MMM YYYY", width=75),
-    'Muni Bus': st.column_config.NumberColumn(format="$%d"),
-    'Muni Metro': st.column_config.NumberColumn(format="$%d"),
-    'BART': st.column_config.NumberColumn(format="$%d"),
-    'Cable Car': st.column_config.NumberColumn(format="$%d"),
-    'Caltrain': st.column_config.NumberColumn(format="$%d"),
-    'Ferry': st.column_config.NumberColumn(format="$%d"),
-    'AC Transit': st.column_config.NumberColumn(format="$%d"),
-    'SamTrans': st.column_config.NumberColumn(format="$%d"),
-    }
 
 # Display tables
 with annual_tab:
@@ -128,20 +120,36 @@ with st.expander('Add trips'):
     with import_tab:
         pdfs = st.file_uploader('Upload Clipper activity pdf',
                                 type='pdf',
-                                accept_multiple_files=True)
+                                accept_multiple_files=True,
+                                label_visibility='collapsed')
         
-        if pdfs: # submit appears only after upload
-            for pdf in pdfs:
-                df_import = categorize(clean_up(get_trips(pdf.name)))
-                check_category(df_import)
-                st.write(pdf.name, ':', df_import)
-            if st.button('Upload all'):
-                for pdf in pdfs:
-                    df = add_trips_to_database(df, df_import)
-                if not df_import.empty:
-                    st.write(df.sort_values('Transaction Date', ascending=False).reset_index(drop=True))
-                    # save_to_gcs(df)
-                    f':green[Uploaded len(df_import) rides!]'
+        if pdfs: # submit appears only after upload    
+            st.session_state.filenames = []
+            
+            if st.button('Process all'):
+                progress_bar = st.progress(0, 'Uploading PDFs')
+                
+                for index, pdf in enumerate(pdfs):
+                    filename = f"{datetime.datetime.now().strftime('%Y%m%d_%H%M')}_{index+1}.pdf"
+                    upload_pdf(pdf, filename)
+                    progress_bar.progress((index + 1) / len(pdfs), 'Uploading PDFs')
+                    st.session_state.filenames.append(filename)
+                
+                for filename in st.session_state.filenames:
+                    filepath = st.secrets['connections']['ccrma']['filepath_web'] + filename
+                    df_import = categorize(clean_up(get_trips(filepath)))
+                    check_category(df_import)
+                    st.session_state.df_import_all = add_trips_to_database(df, df_import)
+                
+                progress_bar.empty()
+                               
+                if st.button('Add all'):
+                    save_to_gcs(st.session_state.df_import_all)
+                    st.success(f'Uploaded!', icon='🚍')
+                    time.sleep(3)
+                    st.rerun()
+                
+                st.write(st.session_state.df_import_all)
     
     with manual_tab:
         # Form elements
