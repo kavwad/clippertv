@@ -14,6 +14,31 @@ SUBMIT_CATEGORIES = {'Muni Bus': 'Muni Bus', 'Muni Metro': 'Muni Metro',
                      'Caltrain': 'Caltrain Entrance', 'Ferry': 'Ferry Entrance',
                      'AC Transit': 'AC Transit', 'SamTrans': 'SamTrans'}
 
+COLUMN_CONFIG = {'Year': st.column_config.NumberColumn(format="%d", width=75),
+                 'Month': st.column_config.DateColumn(format="MMM YYYY", width=75),
+                 'Muni Bus': st.column_config.NumberColumn(format="$%d"),
+                 'Muni Metro': st.column_config.NumberColumn(format="$%d"),
+                 'BART': st.column_config.NumberColumn(format="$%d"),
+                 'Cable Car': st.column_config.NumberColumn(format="$%d"),
+                 'Caltrain': st.column_config.NumberColumn(format="$%d"),
+                 'Ferry': st.column_config.NumberColumn(format="$%d"),
+                 'AC Transit': st.column_config.NumberColumn(format="$%d"),
+                 'SamTrans': st.column_config.NumberColumn(format="$%d"),
+                 }
+
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+def upload_pdf(pdf, filename):
+    ssh.connect(hostname=st.secrets['connections']['ssh']['hostname'],
+                username=st.secrets['connections']['ssh']['username'],
+                password=st.secrets['connections']['ssh']['password'])
+    sftp = ssh.open_sftp()
+    sftp.putfo(BytesIO(pdf.read()), st.secrets['connections']['ssh']['filepath']
+               + filename)
+    sftp.close()
+    ssh.close()
+
 # Set up the page
 st.set_page_config(page_title="Kaveh’s transit trips")
 st.title('Kaveh’s transit trips', anchor=False)
