@@ -1,7 +1,6 @@
 raw_data/
+scratch/
 .streamlit/
-data_k.csv
-test.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
