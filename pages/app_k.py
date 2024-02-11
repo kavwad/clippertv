@@ -6,8 +6,7 @@ import streamlit as st
 import time
 
 from analyze_trips import create_charts, load_data, process_data
-from import_pdf import get_trips, categorize, clean_up, check_category, add_trips_to_database, save_to_gcs
-from pages.import_pdf import upload_pdf
+from import_pdf import get_trips, categorize, clean_up, check_category, add_trips_to_database, save_to_gcs, upload_pdf
 
 DISP_CATEGORIES = ['Muni Bus', 'Muni Metro', 'BART', 'Cable Car',
                    'Caltrain', 'Ferry', 'AC Transit', 'SamTrans']
@@ -153,24 +152,16 @@ with st.expander('Add trips'):
                                                               'Transaction Type',
                                                               'Category'])
 
-        button_col1, button_col2 = st.columns([1,5])
-        
         # Add rides button
-        with button_col1:
-            if st.button('Add ride(s)'):
-                for i in range(rides):
-                    new_row = pd.DataFrame({
-                        'Transaction Date': [pd.Timestamp(transaction_date)],
-                        'Transaction Type': ['Manual entry'],
-                        'Category': [SUBMIT_CATEGORIES[category]]
-                    })
-                    st.session_state.new_rows = pd.concat([st.session_state.new_rows, new_row])
+        if st.button('Add ride(s)'):
+            for i in range(rides):
+                new_row = pd.DataFrame({
+                    'Transaction Date': [pd.Timestamp(transaction_date)],
+                    'Transaction Type': ['Manual entry'],
+                    'Category': [SUBMIT_CATEGORIES[category]]
+                })
+                st.session_state.new_rows = pd.concat([st.session_state.new_rows, new_row])
         
-        # Undo button
-        with button_col2:
-            if st.button('Undo'):
-                st.session_state.new_rows = st.session_state.new_rows.iloc[:-1]
-
         # Display new_rows and submit button
         if not st.session_state.new_rows.empty:
             with st.container(border=True):
@@ -186,6 +177,10 @@ with st.expander('Add trips'):
                                 'Category': 'Mode'},
                             )
 
+                # Undo button
+                if st.button('Remove last ride'):
+                    st.session_state.new_rows = st.session_state.new_rows.iloc[:-1]
+                
                 # Submit button
                 if st.button('Submit all'):
                     df = (pd.concat([df, st.session_state.new_rows]).
