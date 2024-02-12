@@ -169,10 +169,10 @@ def create_rides_chart(riders):
         total_rides_per_month = create_pivot_month(df).sum(axis=1)
         total_rides_per_month.index = pd.to_datetime(total_rides_per_month.index, format='%b %Y')
         comparison_chart.add_trace(go.Scatter(x=total_rides_per_month.index,
-                                        y=total_rides_per_month,
-                                        mode='lines',
-                                        line_shape='spline',
-                                        name=rider))
+                                              y=total_rides_per_month,
+                                              mode='lines',
+                                              line_shape='spline',
+                                              name=rider))
 
     comparison_chart.update_layout(title_text='Total Rides Per Month',
                                    yaxis_title='Total Rides',
