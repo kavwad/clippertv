@@ -101,6 +101,9 @@ with monthly_tab:
                     use_container_width=True,
                     column_config=COLUMN_CONFIG)
 
+with comparison_tab:
+    st.plotly_chart(rides_chart, use_container_width=True)
+
 st.divider()
 
 # Display add trips expander
