@@ -190,7 +190,7 @@ with st.expander('Add trips'):
                             sort_values('Transaction Date', ascending=False).
                             reset_index)(drop=True)
                     
-                    save_to_gcs(df)
+                    save_to_gcs(st.session_state.rider, df)
 
                     st.session_state.new_rows = pd.DataFrame(columns=['Transaction Date',
                                                                       'Transaction Type',
