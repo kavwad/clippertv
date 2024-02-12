@@ -159,3 +159,20 @@ def create_cost_chart(pivot_month_cost):
 
     cost_chart.update_traces(hovertemplate= '<b>%{x|%B %Y}</b>: $%{y}')
     return cost_chart
+
+def create_rides_chart(riders):
+    line_chart = go.Figure()
+    for rider in riders:
+        df = load_data(rider)
+        total_rides_per_month = create_pivot_month(df).sum(axis=1)
+        total_rides_per_month.index = pd.to_datetime(total_rides_per_month.index, format='%b %Y')
+        line_chart.add_trace(go.Scatter(x=total_rides_per_month.index,
+                                        y=total_rides_per_month,
+                                        mode='lines',
+                                        line_shape='spline',
+                                        name=rider))
+
+    line_chart.update_layout(title_text='Total Rides Per Month',
+                             yaxis_title='Total Rides')    
+    
+    return line_chart
