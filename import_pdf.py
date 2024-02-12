@@ -81,8 +81,8 @@ def upload_pdf(pdf, filename):
     sftp.close()
     ssh.close()
     
-def save_to_gcs(df):
-    df.to_csv('gcs://clippertv_data/data_k.csv',
+def save_to_gcs(rider, df):
+    df.to_csv('gcs://clippertv_data/data_' + rider.lower() + '.csv',
                                 index=False,
                                 storage_options={'token':
                                                 json.loads(st.secrets['gcs_key'])})

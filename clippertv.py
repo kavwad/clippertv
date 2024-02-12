@@ -135,7 +135,8 @@ with st.expander('Add trips'):
                 progress_bar.empty()
                                
                 if st.button('Add all'):
-                    save_to_gcs(st.session_state.df_import_all)
+                    save_to_gcs(st.session_state.rider,
+                                st.session_state.df_import_all)
                     st.success(f'Uploaded!', icon='🚍')
                     time.sleep(3)
                     st.rerun()
