@@ -169,7 +169,7 @@ with st.expander('Add trips'):
         # Display new_rows and submit button
         if not st.session_state.new_rows.empty:
             with st.container(border=True):
-                st.markdown(':rotating_light: :red[for K & B use only!] :rotating_light:')
+                st.error('for K & B use only!', icon='🚨')
                 
                 st.data_editor(st.session_state.new_rows,
                             column_config={
