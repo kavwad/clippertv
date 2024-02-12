@@ -4,6 +4,7 @@ import json
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 
@@ -31,10 +32,11 @@ def process_data(df):
     free_xfers = ((df['Transaction Type'] == 'Single-tag fare payment') & (df['Debit'].isna())).sum()
     return pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers
 
-def create_charts(pivot_month, pivot_month_cost):
+def create_charts(pivot_month, pivot_month_cost, riders):
     trip_chart = create_trip_chart(pivot_month)
     cost_chart = create_cost_chart(pivot_month_cost)
-    return trip_chart, cost_chart
+    rides_chart = create_rides_chart(riders)
+    return trip_chart, cost_chart, rides_chart
 
 def create_pivot_year(df):
     pivot_year = (df.pivot_table(index=df['Transaction Date'].dt.year,
