@@ -29,13 +29,19 @@ COLUMN_CONFIG = {'Year': st.column_config.NumberColumn(format="%d", width=75),
                  }
 
 # Set up the page
-st.set_page_config(page_title="Kaveh’s transit trips", layout='wide')
-st.title('Kaveh’s transit trips', anchor=False)
-# st.sidebar.markdown('# Kaveh')
-# st.sidebar.markdown('# Bree')
+st.set_page_config(page_title="ClipperTV", layout='wide')
+
+# Set up title and rider chooser
+col1, col2 = st.columns(2)
+with col1:
+    st.title('Welcome to Clipper TV!', anchor=False)
+with col2:
+    st.session_state.rider = st.radio('Choose your rider',
+                                    ['K', 'B'],
+                                    label_visibility='hidden')
 
 # Load and process data
-df = load_data()
+df = load_data(st.session_state.rider)
 pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(df)
 trip_chart, cost_chart = create_charts(pivot_month, pivot_month_cost)
 
@@ -45,29 +51,29 @@ cost_this_month = pivot_month_cost.iloc[0].sum().round().astype(int)
 
 trip_diff = pivot_month.iloc[1].sum() - pivot_month.iloc[0].sum()
 trip_diff_text = "fewer" if trip_diff >= 0 else "more"
+
 cost_diff = (pivot_month_cost.iloc[1].sum()
              - pivot_month_cost.iloc[0].sum()).round().astype(int)
 cost_diff_text = "less" if cost_diff >= 0 else "more"
 
 # Create formatted strings
-f"#### You took **:red[{trips_this_month}]** trips in\
+f"#### {st.session_state.rider} took **:red[{trips_this_month}]** trips in\
     {pivot_month.index[0].strftime('%B')}, which cost\
     **:red[${cost_this_month}]**."
-f"You rode **{pivot_month.iloc[0].idxmax()}** most, at\
+f"{st.session_state.rider} rode **{pivot_month.iloc[0].idxmax()}** most, at\
     **{pivot_month.iloc[0][pivot_month.iloc[0].idxmax()]}** times.\
-    Altogether, you took {abs(trip_diff)} {trip_diff_text} trips and paid\
+    Altogether, {st.session_state.rider} took {abs(trip_diff)} {trip_diff_text} trips and paid\
         ${abs(cost_diff)} {cost_diff_text} than the previous month."
-f"Since 2021, you've gotten **{free_xfers}** free transfers!"
-
 if pivot_month.iloc[0].sum() > pivot_year.iloc[0].sum():
     f"This year, he's taken **{pivot_year.iloc[0].sum()}** trips,\
         costing **${pivot_year_cost.iloc[0].sum().round().astype(int)}**."
+f"Since 2021, {st.session_state.rider} has gotten **{free_xfers}** free transfers!"
 
 # Display charts
 st.plotly_chart(trip_chart, use_container_width=True)
 st.plotly_chart(cost_chart, use_container_width=True)
 
-# Set up tabs and tables
+# Set up table tabs
 annual_tab, monthly_tab = st.tabs(['Annual stats', 'Monthly stats'])
 
 # Display tables
@@ -137,7 +143,6 @@ with st.expander('Add trips'):
                 st.write(st.session_state.df_import_all)
     
     with manual_tab:
-        # Form elements
         col1, col2, col3 = st.columns(3)
         with col1:
             transaction_date = st.date_input('Date:', format='MM/DD/YYYY')
@@ -146,13 +151,11 @@ with st.expander('Add trips'):
         with col3:
             rides = st.number_input('Rides:', min_value=1, step=1)
 
-        # Initialize new_rows in session state
         if 'new_rows' not in st.session_state:
             st.session_state.new_rows = pd.DataFrame(columns=['Transaction Date',
                                                               'Transaction Type',
                                                               'Category'])
 
-        # Add rides button
         if st.button('Add ride(s)'):
             for i in range(rides):
                 new_row = pd.DataFrame({
@@ -174,8 +177,7 @@ with st.expander('Add trips'):
                                     label='Date',
                                     format='MM/DD/YYYY'),
                                 'Transaction Type': None,
-                                'Category': 'Mode'},
-                            )
+                                'Category': 'Mode'})
 
                 # Undo button
                 if st.button('Remove last ride'):

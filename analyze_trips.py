@@ -17,8 +17,8 @@ COLOR_MAP = {'Muni Bus': '#BA0C2F', 'Muni Metro': '#FDB813', 'BART': '#0099CC',
              'Cable Car': '#8B4513', 'Caltrain': '#6C6C6C', 'AC Transit': '#00A55E',
              'Ferry': '#4DD0E1', 'SamTrans': '#D3D3D3'}
 
-def load_data():
-    df = pd.read_csv('gcs://clippertv_data/data_k.csv',
+def load_data(rider):
+    df = pd.read_csv('gcs://clippertv_data/data_' + rider.lower() + '.csv',
                      parse_dates=['Transaction Date'],
                      storage_options={'token': json.loads(st.secrets['gcs_key'])})
     return df
