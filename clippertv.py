@@ -36,14 +36,15 @@ col1, col2 = st.columns(2)
 with col1:
     st.title('Welcome to Clipper TV!', anchor=False)
 with col2:
+    riders = ['K', 'B']
     st.session_state.rider = st.radio('Choose your rider',
-                                    ['K', 'B'],
+                                    riders,
                                     label_visibility='hidden')
 
 # Load and process data
 df = load_data(st.session_state.rider)
 pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(df)
-trip_chart, cost_chart = create_charts(pivot_month, pivot_month_cost)
+trip_chart, cost_chart, rides_chart = create_charts(pivot_month, pivot_month_cost, riders)
 
 # Display summary
 trips_this_month = pivot_month.iloc[0].sum()
@@ -73,8 +74,10 @@ f"Since 2021, {st.session_state.rider} has gotten **{free_xfers}** free transfer
 st.plotly_chart(trip_chart, use_container_width=True)
 st.plotly_chart(cost_chart, use_container_width=True)
 
-# Set up table tabs
-annual_tab, monthly_tab = st.tabs(['Annual stats', 'Monthly stats'])
+# Set up  tabs
+annual_tab, monthly_tab, comparison_tab = st.tabs(['Annual stats',
+                                                   'Monthly stats',
+                                                   'Tête-à-tête'])
 
 # Display tables
 with annual_tab:
