@@ -32,14 +32,12 @@ COLUMN_CONFIG = {'Year': st.column_config.NumberColumn(format="%d", width=75),
 st.set_page_config(page_title="ClipperTV", layout='wide')
 
 # Set up title and rider chooser
-col1, col2 = st.columns(2)
-with col1:
-    st.title('Welcome to Clipper TV!', anchor=False)
-with col2:
-    riders = ['K', 'B']
-    st.session_state.rider = st.radio('Choose your rider',
-                                    riders,
-                                    label_visibility='hidden')
+riders = ['K', 'B']
+st.session_state.rider = st.radio('Choose your rider',
+                                riders,
+                                horizontal=True,
+                                label_visibility='hidden')
+st.title('Welcome to Clipper TV!', anchor=False)
 
 # Load and process data
 df = load_data(st.session_state.rider)
