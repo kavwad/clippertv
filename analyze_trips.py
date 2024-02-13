@@ -168,16 +168,21 @@ def create_rides_chart(riders):
         df = load_data(rider)
         total_rides_per_month = create_pivot_month(df).sum(axis=1)
         total_rides_per_month.index = pd.to_datetime(total_rides_per_month.index, format='%b %Y')
+        
+        chart_colors = {'K': COLOR_MAP['Muni Metro'], 'B': COLOR_MAP['AC Transit']}
         comparison_chart.add_trace(go.Scatter(x=total_rides_per_month.index,
                                               y=total_rides_per_month,
                                               mode='lines',
-                                              line_shape='spline',
-                                              name=rider))
+                                              name=rider,
+                                              line_color=chart_colors[rider],
+                                              line_shape='spline'))
 
-    comparison_chart.update_layout(title_text='Total Rides Per Month',
-                                   yaxis_title='Total Rides',
-                                   hovermode='x unified')
+    comparison_chart.update_layout(title_text='Trips per month',
+                                   yaxis_title='Trips',
+                                   hovermode='x unified',
+                                   xaxis={'hoverformat': '%b %Y'}
+                                   )
 
-    comparison_chart.update_traces(hovertemplate= '<b>%{x|%B %Y}</b>: %{y}')
+    comparison_chart.update_traces(hovertemplate='<b>%{y}</b>')
 
     return comparison_chart
