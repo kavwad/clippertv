@@ -5,8 +5,8 @@ import pandas as pd
 import streamlit as st
 import time
 
-from analyze_trips import create_charts, load_data, process_data
-from import_pdf import get_trips, categorize, clean_up, check_category, add_trips_to_database, save_to_gcs, upload_pdf
+from analyze_trips import load_data, process_data, create_charts
+from import_pdf import get_trips, categorize, clean_up, check_category, add_trips_to_database, upload_pdf, save_to_gcs
 
 DISP_CATEGORIES = ['Muni Bus', 'Muni Metro', 'BART', 'Cable Car',
                    'Caltrain', 'Ferry', 'AC Transit', 'SamTrans']
