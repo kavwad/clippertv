@@ -32,7 +32,7 @@ COLUMN_CONFIG = {'Year': st.column_config.NumberColumn(format="%d", width=75),
 st.set_page_config(page_title="ClipperTV", layout='wide')
 
 # Set up title and rider chooser
-riders = ['K', 'B']
+riders = ['B', 'K']
 st.session_state.rider = st.radio('Choose your rider',
                                 riders,
                                 horizontal=True,
