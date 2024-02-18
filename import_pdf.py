@@ -88,14 +88,15 @@ def save_to_gcs(rider, df):
                                                 json.loads(st.secrets['gcs_key'])})
 
 def main():
-    filename = sys.argv[1]
+    rider = sys.argv[1]
+    filename = sys.argv[2]
 
-    df = load_data()
+    df = load_data(rider)
     df_import = get_trips(filename)
     df_import = categorize(clean_up(df_import))
     check_category(df_import)
     df = add_trips_to_database(df, df_import)
-    save_to_gcs(df)
+    save_to_gcs(rider, df)
 
 if __name__ == '__main__':
     main()
