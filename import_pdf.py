@@ -59,7 +59,7 @@ def check_category(df_import):
         raise ValueError('Some transactions are not categorized')
 
 def clean_up(df_import):
-    df_import['Transaction Date'] = pd.to_datetime(df_import['Transaction Date'])
+    df_import['Transaction Date'] = pd.to_datetime(df_import['Transaction Date'], format='%b %Y')
     
     for col in ['Debit', 'Credit', 'Balance']:
         if df_import[col].any():
