@@ -68,8 +68,8 @@ f"{st.session_state.rider} rode **{pivot_month.iloc[0].idxmax()}** most, at\
 if pivot_month.iloc[0].sum() > pivot_year.iloc[0].sum():
     f"This year, he's taken **{pivot_year.iloc[0].sum()}** trips,\
         costing **${pivot_year_cost.iloc[0].sum().round().astype(int)}**."
-f"Since 2021, {
-    st.session_state.rider} has gotten **{free_xfers}** free transfers!"
+f"Since 2021,\
+      {st.session_state.rider} has gotten **{free_xfers}** free transfers!"
 
 # Display charts
 st.plotly_chart(trip_chart, use_container_width=True)
