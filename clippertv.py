@@ -128,8 +128,8 @@ with st.expander('Add trips'):
                 progress_bar = st.progress(0, 'Uploading PDFs')
 
                 for index, pdf in enumerate(pdfs):
-                    filename = f"{datetime.datetime.now().strftime('%Y%m%d_%H%M')}_{
-                        index+1}.pdf"
+                    filename = f"{datetime.datetime.now().strftime('%Y%m%d_%H%M')}_\
+                        {index+1}.pdf"
                     upload_pdf(pdf, filename)
                     progress_bar.progress(
                         (index + 1) / len(pdfs), 'Uploading PDFs')
