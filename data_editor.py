@@ -1,4 +1,3 @@
-import pandas as pd
 import streamlit as st
 
 from import_pdf import load_data
