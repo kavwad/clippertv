@@ -34,15 +34,17 @@ st.set_page_config(page_title="ClipperTV", layout='wide')
 # Set up title and rider chooser
 riders = ['B', 'K']
 st.session_state.rider = st.radio('Choose your rider',
-                                riders,
-                                horizontal=True,
-                                label_visibility='hidden')
+                                  riders,
+                                  horizontal=True,
+                                  label_visibility='hidden')
 st.title('Welcome to Clipper TV!', anchor=False)
 
 # Load and process data
 df = load_data(st.session_state.rider)
-pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(df)
-trip_chart, cost_chart, rides_chart = create_charts(pivot_month, pivot_month_cost, riders)
+pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(
+    df)
+trip_chart, cost_chart, rides_chart = create_charts(
+    pivot_month, pivot_month_cost, riders)
 
 # Display summary
 trips_this_month = pivot_month.iloc[0].sum()
@@ -66,7 +68,8 @@ f"{st.session_state.rider} rode **{pivot_month.iloc[0].idxmax()}** most, at\
 if pivot_month.iloc[0].sum() > pivot_year.iloc[0].sum():
     f"This year, he's taken **{pivot_year.iloc[0].sum()}** trips,\
         costing **${pivot_year_cost.iloc[0].sum().round().astype(int)}**."
-f"Since 2021, {st.session_state.rider} has gotten **{free_xfers}** free transfers!"
+f"Since 2021, {
+    st.session_state.rider} has gotten **{free_xfers}** free transfers!"
 
 # Display charts
 st.plotly_chart(trip_chart, use_container_width=True)
@@ -81,26 +84,26 @@ annual_tab, monthly_tab, comparison_tab = st.tabs(['Annual stats',
 with annual_tab:
     st.subheader('Annual trips by mode', anchor=False)
     st.dataframe(pivot_year,
-                    use_container_width=True,
-                    column_config={'Year':
-                                   st.column_config.NumberColumn(format="%d",
-                                                                 width=75)})
+                 use_container_width=True,
+                 column_config={'Year':
+                                st.column_config.NumberColumn(format="%d",
+                                                              width=75)})
     st.subheader('Annual trip cost by mode', anchor=False)
     st.dataframe(pivot_year_cost,
-                    use_container_width=True,
-                    column_config=COLUMN_CONFIG)
+                 use_container_width=True,
+                 column_config=COLUMN_CONFIG)
 
 with monthly_tab:
     st.subheader('Monthly trips by mode', anchor=False)
     st.dataframe(pivot_month,
-                    use_container_width=True,
-                    column_config={'Month':
-                                   st.column_config.DateColumn(format="MMM YYYY",
-                                                               width=75)})
+                 use_container_width=True,
+                 column_config={'Month':
+                                st.column_config.DateColumn(format="MMM YYYY",
+                                                            width=75)})
     st.subheader('Monthly trip cost by mode', anchor=False)
     st.dataframe(pivot_month_cost,
-                    use_container_width=True,
-                    column_config=COLUMN_CONFIG)
+                 use_container_width=True,
+                 column_config=COLUMN_CONFIG)
 
 with comparison_tab:
     st.plotly_chart(rides_chart, use_container_width=True)
@@ -109,44 +112,47 @@ st.divider()
 
 # Display add trips expander
 with st.expander('Add trips'):
-    
+
     import_tab, manual_tab = st.tabs(['Import from pdf', 'Add manually'])
-    
+
     with import_tab:
         pdfs = st.file_uploader('Upload Clipper activity pdf',
                                 type='pdf',
                                 accept_multiple_files=True,
                                 label_visibility='collapsed')
-        
-        if pdfs: # submit appears only after upload    
+
+        if pdfs:  # submit appears only after upload
             st.session_state.filenames = []
-            
+
             if st.button('Process all'):
                 progress_bar = st.progress(0, 'Uploading PDFs')
-                
+
                 for index, pdf in enumerate(pdfs):
-                    filename = f"{datetime.datetime.now().strftime('%Y%m%d_%H%M')}_{index+1}.pdf"
+                    filename = f"{datetime.datetime.now().strftime('%Y%m%d_%H%M')}_{
+                        index+1}.pdf"
                     upload_pdf(pdf, filename)
-                    progress_bar.progress((index + 1) / len(pdfs), 'Uploading PDFs')
+                    progress_bar.progress(
+                        (index + 1) / len(pdfs), 'Uploading PDFs')
                     st.session_state.filenames.append(filename)
-                
+
                 for filename in st.session_state.filenames:
                     filepath = st.secrets['connections']['ccrma']['filepath_web'] + filename
                     df_import = categorize(clean_up(get_trips(filepath)))
                     check_category(df_import)
-                    st.session_state.df_import_all = add_trips_to_database(df, df_import)
-                
+                    st.session_state.df_import_all = add_trips_to_database(
+                        df, df_import)
+
                 progress_bar.empty()
-                               
+
                 if st.button('Add all'):
                     save_to_gcs(st.session_state.rider,
                                 st.session_state.df_import_all)
                     st.success(f'Uploaded!', icon='🚍')
                     time.sleep(3)
                     st.rerun()
-                
+
                 st.write(st.session_state.df_import_all)
-    
+
     with manual_tab:
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -168,36 +174,37 @@ with st.expander('Add trips'):
                     'Transaction Type': ['Manual entry'],
                     'Category': [SUBMIT_CATEGORIES[category]]
                 })
-                st.session_state.new_rows = pd.concat([st.session_state.new_rows, new_row])
-        
+                st.session_state.new_rows = pd.concat(
+                    [st.session_state.new_rows, new_row])
+
         # Display new_rows and submit button
         if not st.session_state.new_rows.empty:
             with st.container(border=True):
                 st.error('for K & B use only!', icon='🚨')
-                
+
                 st.data_editor(st.session_state.new_rows,
-                            column_config={
-                                '_index': None,
-                                'Transaction Date': st.column_config.DateColumn(
-                                    label='Date',
-                                    format='MM/DD/YYYY'),
-                                'Transaction Type': None,
-                                'Category': 'Mode'})
+                               column_config={
+                                   '_index': None,
+                                   'Transaction Date': st.column_config.DateColumn(
+                                       label='Date',
+                                       format='MM/DD/YYYY'),
+                                   'Transaction Type': None,
+                                   'Category': 'Mode'})
 
                 # Undo button
                 if st.button('Remove last ride'):
                     st.session_state.new_rows = st.session_state.new_rows.iloc[:-1]
-                
+
                 # Submit button
                 if st.button('Submit all'):
                     df = (pd.concat([df, st.session_state.new_rows]).
-                            sort_values('Transaction Date', ascending=False).
-                            reset_index)(drop=True)
-                    
+                          sort_values('Transaction Date', ascending=False).
+                          reset_index)(drop=True)
+
                     save_to_gcs(st.session_state.rider, df)
 
                     st.session_state.new_rows = pd.DataFrame(columns=['Transaction Date',
                                                                       'Transaction Type',
                                                                       'Category'])
-                    
+
                     st.rerun()
