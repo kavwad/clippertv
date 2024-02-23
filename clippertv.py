@@ -144,7 +144,7 @@ with st.expander('Add trips'):
 
                 progress_bar.empty()
 
-                if st.button('Add all'):
+                if st.button('Submit all', type='primary'):
                     save_to_gcs(st.session_state.rider,
                                 st.session_state.df_import_all)
                     st.success(f'Uploaded!', icon='🚍')
@@ -196,7 +196,7 @@ with st.expander('Add trips'):
                     st.session_state.new_rows = st.session_state.new_rows.iloc[:-1]
 
                 # Submit button
-                if st.button('Submit all'):
+                if st.button('Submit all', type='primary'):
                     df = (pd.concat([df, st.session_state.new_rows]).
                           sort_values('Transaction Date', ascending=False).
                           reset_index)(drop=True)
