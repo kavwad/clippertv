@@ -123,6 +123,7 @@ with st.expander('Add trips'):
 
         if pdfs:  # submit appears only after upload
             st.session_state.filenames = []
+            df_import = None
 
             if st.button('Process all'):
                 progress_bar = st.progress(0, 'Uploading PDFs')
@@ -143,14 +144,14 @@ with st.expander('Add trips'):
 
                 progress_bar.empty()
 
-                if st.button('Submit all', type='primary'):
-                    save_to_gcs(st.session_state.rider,
-                                st.session_state.df_import_all)
-                    st.success(f'Uploaded!', icon='🚍')
-                    time.sleep(3)
-                    st.rerun()
+            if st.button('Submit all', type='primary'):
+                save_to_gcs(st.session_state.rider,
+                            st.session_state.df_import_all)
+                st.success(f'Uploaded!', icon='🚍')
+                time.sleep(3)
+                st.rerun()
 
-                st.write(st.session_state.df_import_all)
+            st.write(st.session_state.df_import_all)
 
     with manual_tab:
         col1, col2, col3 = st.columns(3)
