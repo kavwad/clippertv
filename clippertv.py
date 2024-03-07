@@ -65,8 +65,8 @@ f"{st.session_state.rider} rode **{pivot_month.iloc[0].idxmax()}** most, at\
     **{pivot_month.iloc[0][pivot_month.iloc[0].idxmax()]}** times.\
     Altogether, {st.session_state.rider} took {abs(trip_diff)} {trip_diff_text} trips and paid\
         ${abs(cost_diff)} {cost_diff_text} than the previous month."
-if pivot_month.iloc[0].sum() > pivot_year.iloc[0].sum():
-    f"This year, he's taken **{pivot_year.iloc[0].sum()}** trips,\
+if pivot_month.index[0].strftime('%B') != 'January':
+    f"This year, {st.session_state.rider} has taken **{pivot_year.iloc[0].sum()}** trips,\
         costing **${pivot_year_cost.iloc[0].sum().round().astype(int)}**."
 f"Since 2021,\
       {st.session_state.rider} has gotten **{free_xfers}** free transfers!"
