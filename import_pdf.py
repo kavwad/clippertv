@@ -20,6 +20,7 @@ def read_pdf_section(filename, pages, table_areas):
     tables = camelot.read_pdf(filename,
                               pages=pages,
                               flavor='stream',
+                              row_tol=15,
                               table_areas=table_areas)
     # [camelot.plot(tables[table], kind='contour').show() for table in tables] # to check table_areas
     dfs = [table.df for table in tables]
