@@ -85,6 +85,7 @@ def create_pivot_month(df):
 
 
 def create_pivot_year_cost(df):
+    # Create pivot table by year and category
     pivot_year_cost = (df.pivot_table(index=df['Transaction Date'].dt.year,
                                       columns='Category',
                                       values=['Debit', 'Credit'],
@@ -92,12 +93,32 @@ def create_pivot_year_cost(df):
                                       fill_value=0
                                       ))
 
-    # Calculate net values for BART, Caltrain, and Ferry
-    pivot_year_cost[('Debit', 'Caltrain')] = (pivot_year_cost[('Debit', 'Caltrain Entrance')] -
-                                              pivot_year_cost[('Credit', 'Caltrain Exit')])
-    pivot_year_cost[('Debit', 'Ferry')] = (pivot_year_cost[('Debit', 'Ferry Entrance')] +
-                                           pivot_year_cost[('Debit', 'Ferry Exit')] -
-                                           pivot_year_cost[('Credit', 'Ferry Exit')])
+    if 'Caltrain Adult 3 Zone Monthly Pass' in df['Product'].unique():
+        # Calculate annual cost for Caltrain monthly pass
+        caltrain_pass_yearly = df.pivot_table(index=df['Transaction Date'].dt.year,
+                                            columns='Product',
+                                            values='Debit',
+                                            aggfunc='sum',
+                                            fill_value=0)[['Caltrain Adult 3 Zone Monthly Pass']]
+        caltrain_pass_yearly.columns = pd.MultiIndex.from_tuples([('Debit', 'Caltrain Pass')])
+
+        # Add Caltrain pass cost to pivot table
+        pivot_year_cost = pivot_year_cost.join(
+            caltrain_pass_yearly, on='Transaction Date').fillna(0)
+
+        # Calculate net values for BART, Caltrain, and Ferry
+        pivot_year_cost[('Debit', 'Caltrain')] = (pivot_year_cost[('Debit', 'Caltrain Entrance')]
+                                                  + pivot_year_cost[('Debit', 'Caltrain Pass')]
+                                                  - pivot_year_cost[('Credit', 'Caltrain Exit')])
+
+    else:
+        pivot_year_cost[('Debit', 'Caltrain')] = (pivot_year_cost[('Debit', 'Caltrain Entrance')]
+                                                  + pivot_year_cost[('Debit', 'Caltrain Pass')]
+                                                  - pivot_year_cost[('Credit', 'Caltrain Exit')])
+
+    pivot_year_cost[('Debit', 'Ferry')] = (pivot_year_cost[('Debit', 'Ferry Entrance')]
+                                           + pivot_year_cost[('Debit', 'Ferry Exit')]
+                                           - pivot_year_cost[('Credit', 'Ferry Exit')])
 
     # Drop credit columns
     pivot_year_cost = pivot_year_cost['Debit']
