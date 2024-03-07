@@ -34,7 +34,7 @@ def get_trips(filename):
     df_import = read_pdf_section(
         filename, '1', ['0,500,800,100'])  # first page
     df_import = pd.concat(
-        [df_import, read_pdf_section(filename, '2-end', ['0,560,800,90'])])
+        [df_import, read_pdf_section(filename, '2-end', ['0,550,800,90'])])
     return df_import.reset_index(drop=True).replace('', np.nan)
 
 
