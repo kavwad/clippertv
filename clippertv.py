@@ -158,7 +158,7 @@ with st.expander('Add trips'):
         with col1:
             transaction_date = st.date_input('Date:', format='MM/DD/YYYY')
         with col2:
-            category = st.selectbox('Mode:', options=DISP_CATEGORIES)
+            category = st.selectbox('Mode:', options=DISP_CATEGORIES + ['Caltrain Pass'])
         with col3:
             rides = st.number_input('Rides:', min_value=1, step=1)
 
@@ -169,11 +169,20 @@ with st.expander('Add trips'):
 
         if st.button('Add ride(s)'):
             for i in range(rides):
-                new_row = pd.DataFrame({
-                    'Transaction Date': [pd.Timestamp(transaction_date)],
-                    'Transaction Type': ['Manual entry'],
-                    'Category': [SUBMIT_CATEGORIES[category]]
-                })
+                if category == 'Caltrain Pass':
+                    new_row = pd.DataFrame({
+                        'Transaction Date': [pd.Timestamp(transaction_date)],
+                        'Transaction Type': ['Manual entry'],
+                        'Product': 'Caltrain Adult 3 Zone Monthly Pass',
+                        'Debit': 184.80,
+                        'Category': ['Reload']
+                    })
+                else:
+                    new_row = pd.DataFrame({
+                        'Transaction Date': [pd.Timestamp(transaction_date)],
+                        'Transaction Type': ['Manual entry'],
+                        'Category': [SUBMIT_CATEGORIES[category]]
+                    })
                 st.session_state.new_rows = pd.concat(
                     [st.session_state.new_rows, new_row])
 
