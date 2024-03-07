@@ -72,7 +72,7 @@ def check_category(df_import):
 
 def clean_up(df_import):
     df_import['Transaction Date'] = pd.to_datetime(
-        df_import['Transaction Date'], format='%b %Y')
+        df_import['Transaction Date'], format='%m-%d-%Y %I:%M %p')
 
     for col in ['Debit', 'Credit', 'Balance']:
         if df_import[col].any():
