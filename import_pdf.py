@@ -117,5 +117,9 @@ def main():
     save_to_gcs(rider, df)
 
 
+# Debug by running streamlit locally
+# filename = 'raw_data/clipper_b_feb.pdf'
+# st.write(get_trips('raw_data/clipper_b_feb.pdf'))
+
 if __name__ == '__main__':
     main()
