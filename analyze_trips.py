@@ -121,12 +121,28 @@ def create_pivot_month_cost(df):
                         .unstack(fill_value=0)
                         )
 
-    # Calculate net values for BART, Caltrain, and Ferry
-    pivot_month_cost[('Debit', 'Caltrain')] = (pivot_month_cost[('Debit', 'Caltrain Entrance')] -
-                                               pivot_month_cost[('Credit', 'Caltrain Exit')])
-    pivot_month_cost[('Debit', 'Ferry')] = (pivot_month_cost[('Debit', 'Ferry Entrance')] +
-                                            pivot_month_cost[('Debit', 'Ferry Exit')] -
-                                            pivot_month_cost[('Credit', 'Ferry Exit')])
+    if 'Caltrain Adult 3 Zone Monthly Pass' in df['Product'].unique():
+        # Calculate monthly cost for Caltrain pass
+        caltrain_pass_monthly = (df[df['Product'] == 'Caltrain Adult 3 Zone Monthly Pass']
+                                .groupby(pd.Grouper(key='Transaction Date', freq='M'))['Debit']
+                                .sum().to_frame(('Debit', 'Caltrain Pass')))
+
+        # Add Caltrain pass cost to pivot table
+        pivot_month_cost = pivot_month_cost.join(
+            caltrain_pass_monthly, on='Transaction Date').fillna(0)
+
+        # Calculate net values for BART, Caltrain, and Ferry
+        pivot_month_cost[('Debit', 'Caltrain')] = (pivot_month_cost[('Debit', 'Caltrain Entrance')]
+                                                + pivot_month_cost[('Debit', 'Caltrain Pass')]
+                                                - pivot_month_cost[('Credit', 'Caltrain Exit')])
+    
+    else:
+        pivot_month_cost[('Debit', 'Caltrain')] = (pivot_month_cost[('Debit', 'Caltrain Entrance')]
+                                                   - pivot_month_cost[('Credit', 'Caltrain Exit')])
+    
+    pivot_month_cost[('Debit', 'Ferry')] = (pivot_month_cost[('Debit', 'Ferry Entrance')]
+                                            + pivot_month_cost[('Debit', 'Ferry Exit')]
+                                            - pivot_month_cost[('Credit', 'Ferry Exit')])
 
     # Drop credit columns
     pivot_month_cost = pivot_month_cost['Debit']
