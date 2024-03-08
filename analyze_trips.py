@@ -113,7 +113,6 @@ def create_pivot_year_cost(df):
 
     else:
         pivot_year_cost[('Debit', 'Caltrain')] = (pivot_year_cost[('Debit', 'Caltrain Entrance')]
-                                                  + pivot_year_cost[('Debit', 'Caltrain Pass')]
                                                   - pivot_year_cost[('Credit', 'Caltrain Exit')])
 
     pivot_year_cost[('Debit', 'Ferry')] = (pivot_year_cost[('Debit', 'Ferry Entrance')]
