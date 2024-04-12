@@ -152,8 +152,6 @@ with st.expander('Add trips'):
                 time.sleep(3)
                 st.rerun()
 
-            st.write(st.session_state.df_import_all)
-
     with manual_tab:
         col1, col2, col3 = st.columns(3)
         with col1:
