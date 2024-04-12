@@ -139,11 +139,12 @@ with st.expander('Add trips'):
                     filepath = st.secrets['connections']['ccrma']['filepath_web'] + filename
                     df_import = categorize(clean_up(get_trips(filepath)))
                     check_category(df_import)
-                    st.session_state.df_import_all = add_trips_to_database(
-                        df, df_import)
+                    st.session_state.df_import_all = add_trips_to_database(df, df_import)
 
                 progress_bar.empty()
 
+                st.write(st.session_state.df_import_all)
+            
             if st.button('Submit all', type='primary'):
                 save_to_gcs(st.session_state.rider,
                             st.session_state.df_import_all)
