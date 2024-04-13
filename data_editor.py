@@ -36,8 +36,6 @@ df_edited_display = st.data_editor(
     use_container_width=True,
     hide_index=True,
     num_rows='dynamic',
-    num_columns='dynamic',
-
     )
 
 if st.button('Re-categorize'):
