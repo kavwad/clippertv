@@ -31,7 +31,14 @@ else:
 
 # Display the data editor with the current state of df_edited
 df_edited_display = st.data_editor(
-    st.session_state.df_edited, hide_index=True, height=500)
+    st.session_state.df_edited,
+    height=500,
+    use_container_width=True,
+    hide_index=True,
+    num_rows='dynamic',
+    num_columns='dynamic',
+
+    )
 
 if st.button('Re-categorize'):
     # Update df_edited in session state with the categorized data
