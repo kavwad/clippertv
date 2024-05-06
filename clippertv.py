@@ -73,7 +73,7 @@ f"Since 2021,\
 st.plotly_chart(trip_chart, use_container_width=True)
 st.plotly_chart(cost_chart, use_container_width=True)
 
-# Set up  tabs
+# Set up tabs
 annual_tab, monthly_tab, bike_walk_tab, comparison_tab = st.tabs(['Annual stats',
                                                                   'Monthly stats',
                                                                   'Active transportation',
