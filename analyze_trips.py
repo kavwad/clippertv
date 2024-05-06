@@ -39,9 +39,9 @@ def process_data(df):
 def create_charts(pivot_month, pivot_month_cost, riders):
     trip_chart = create_trip_chart(pivot_month)
     cost_chart = create_cost_chart(pivot_month_cost)
-    rides_chart = create_rides_chart(riders)
-    return trip_chart, cost_chart, rides_chart
-
+    bike_walk_chart = create_bike_walk_chart(riders)
+    comparison_chart = create_comparison_chart(riders)
+    return trip_chart, cost_chart, bike_walk_chart, comparison_chart
 
 def create_pivot_year(df):
     pivot_year = (df.pivot_table(index=df['Transaction Date'].dt.year,
@@ -199,11 +199,8 @@ def create_trip_chart(pivot_month):
 
 
 def create_cost_chart(pivot_month_cost):
-    pivot_month_cost.index = pd.to_datetime(
-        pivot_month_cost.index, format='%b %Y')
-    cost_chart = px.bar(pivot_month_cost,
-                        color_discrete_map=COLOR_MAP,
-                        )
+    pivot_month_cost.index = pd.to_datetime(pivot_month_cost.index, format='%b %Y')
+    cost_chart = px.bar(pivot_month_cost, color_discrete_map=COLOR_MAP)
 
     cost_chart.update_layout(
         title_text="Monthly transit cost",
@@ -216,7 +213,40 @@ def create_cost_chart(pivot_month_cost):
     return cost_chart
 
 
-def create_rides_chart(riders):
+def create_bike_walk_chart(riders):
+    # if riders == ['K']:
+    with open('/Users/kaveh/Library/Mobile Documents/iCloud~com~ifunography~HealthExport/Documents/Cycling Distance/HealthAutoExport-2023-10-23.json') as f:
+        data = json.load(f)
+
+    bike_walk_df = pd.json_normalize(data['data']['metrics'],
+                                    record_path='data', meta=['name'])
+    bike_walk_df['date'] = pd.to_datetime(bike_walk_df['date'], utc=True)
+    bike_walk_df['name'] = bike_walk_df['name'].str.replace('walking_running_distance', 'Walking/Running')
+    bike_walk_df['name'] = bike_walk_df['name'].str.replace('cycling_distance', 'Cycling')
+
+    # Group by 'name' and 'date' and then resample. Ensure 'name' stays as a column.
+    monthly_sum_by_activity = bike_walk_df.groupby(['name', pd.Grouper(key='date', freq='M')])['qty'].sum().reset_index()
+
+    # Convert the 'date' from Period to Timestamp if needed
+    monthly_sum_by_activity['date'] = monthly_sum_by_activity['date'].dt.to_period('M').dt.start_time
+
+    # Plotting the data, separating by activity type
+    bike_walk_chart = px.bar(monthly_sum_by_activity, x='date', y='qty', color='name',
+                            title='Monthly Distance by Activity Type',
+                            labels={'date': 'Date', 'qty': 'Distance (mi)', 'name': 'Activity Type'}, barmode='group')
+
+    bike_walk_chart.update_layout(
+        xaxis_title='',
+        yaxis_title='Distance (mi)',
+        legend_title='',
+        bargap=0.1)
+    
+    bike_walk_chart.update_traces(hovertemplate='<b>%{x|%b %d, %Y}</b>: %{y}')
+        
+    return bike_walk_chart
+
+
+def create_comparison_chart(riders):
     comparison_chart = go.Figure()
     for rider in riders:
         df = load_data(rider)
