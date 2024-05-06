@@ -67,7 +67,7 @@ def categorize(df_import):
 
 def check_category(df_import):
     if df_import['Category'].isna().any():
-        raise ValueError('Some transactions are not categorized')
+        print('Some transactions are not categorized')
 
 
 def clean_up(df_import):
