@@ -44,7 +44,7 @@ df = load_data(st.session_state.rider)
 pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(df)
 trip_chart, cost_chart, bike_walk_chart, comparison_chart = create_charts(pivot_month, pivot_month_cost, riders)
 
-# Display summary
+# Caculate summary stats summary
 trips_this_month = pivot_month.iloc[0].sum()
 cost_this_month = pivot_month_cost.iloc[0].sum().round().astype(int)
 
@@ -55,19 +55,46 @@ cost_diff = (pivot_month_cost.iloc[1].sum()
              - pivot_month_cost.iloc[0].sum()).round().astype(int)
 cost_diff_text = "less" if cost_diff >= 0 else "more"
 
+most_recent_date = df['Transaction Date'].max()
+this_month = df[((df['Transaction Date'].dt.year == most_recent_date.year)
+                        & (df['Transaction Date'].dt.month == most_recent_date.month))]
+
+if 'Caltrain Adult 3 Zone Monthly Pass' in this_month['Product'].values:
+    pass_rides = this_month[(this_month['Category'].str.contains('Caltrain')).fillna(False)
+                                   & (this_month['Transaction Type'] == 'Manual entry')]
+
+    pass_savings = len(pass_rides) * 7.70
+    pass_cost = 184.80
+    additional_caltrain_cost = this_month[(this_month['Category'].str.contains('Caltrain')).fillna(False)][['Debit', 'Credit']].sum()
+    additional_caltrain_cost = additional_caltrain_cost['Debit'] - additional_caltrain_cost['Credit']
+    
+    pass_upshot = (pass_savings - pass_cost + additional_caltrain_cost).round(0).astype(int)
+else:
+    pass_upshot = None
+
 # Create formatted strings
 f"#### {st.session_state.rider} took **:red[{trips_this_month}]** trips in\
     {pivot_month.index[0].strftime('%B')}, which cost\
     **:red[${cost_this_month}]**."
+
 f"{st.session_state.rider} rode **{pivot_month.iloc[0].idxmax()}** most, at\
     **{pivot_month.iloc[0][pivot_month.iloc[0].idxmax()]}** times.\
     Altogether, {st.session_state.rider} took {abs(trip_diff)} {trip_diff_text} trips and paid\
         ${abs(cost_diff)} {cost_diff_text} than the previous month."
+
+if pass_upshot:
+    if pass_upshot < 0:
+        f"This month, {st.session_state.rider} saved **${-pass_upshot}** with a Caltrain pass."
+    elif pass_upshot > 0:
+        f"This month, {st.session_state.rider} spent an extra **${pass_upshot}** by getting a Caltrain pass (!!)."
+    else: 
+        f"This month, {st.session_state.rider} broke even with a Caltrain pass."
+
 if pivot_month.index[0].strftime('%B') != 'January':
     f"This year, {st.session_state.rider} has taken **{pivot_year.iloc[0].sum()}** trips,\
         costing **${pivot_year_cost.iloc[0].sum().round().astype(int)}**."
-f"Since 2021,\
-      {st.session_state.rider} has gotten **{free_xfers}** free transfers!"
+
+# f"Since 2021,{st.session_state.rider} has gotten **{free_xfers}** free transfers!"
 
 # Display charts
 st.plotly_chart(trip_chart, use_container_width=True)
