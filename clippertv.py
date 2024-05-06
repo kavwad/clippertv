@@ -173,7 +173,7 @@ with st.expander('Add trips'):
                         'Transaction Date': [pd.Timestamp(transaction_date)],
                         'Transaction Type': ['Manual entry'],
                         'Product': 'Caltrain Adult 3 Zone Monthly Pass',
-                        'Debit': 184.80,
+                        'Credit': 184.80,
                         'Category': ['Reload']
                     })
                 else:
