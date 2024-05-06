@@ -41,10 +41,8 @@ st.title('Welcome to Clipper TV!', anchor=False)
 
 # Load and process data
 df = load_data(st.session_state.rider)
-pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(
-    df)
-trip_chart, cost_chart, rides_chart = create_charts(
-    pivot_month, pivot_month_cost, riders)
+pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(df)
+trip_chart, cost_chart, bike_walk_chart, comparison_chart = create_charts(pivot_month, pivot_month_cost, riders)
 
 # Display summary
 trips_this_month = pivot_month.iloc[0].sum()
@@ -76,9 +74,10 @@ st.plotly_chart(trip_chart, use_container_width=True)
 st.plotly_chart(cost_chart, use_container_width=True)
 
 # Set up  tabs
-annual_tab, monthly_tab, comparison_tab = st.tabs(['Annual stats',
-                                                   'Monthly stats',
-                                                   'Tête-à-tête'])
+annual_tab, monthly_tab, bike_walk_tab, comparison_tab = st.tabs(['Annual stats',
+                                                                  'Monthly stats',
+                                                                  'Active transportation',
+                                                                  'Tête-à-tête'])
 
 # Display tables
 with annual_tab:
@@ -105,8 +104,14 @@ with monthly_tab:
                  use_container_width=True,
                  column_config=COLUMN_CONFIG)
 
+with bike_walk_tab:
+    if st.session_state.rider == 'K':
+        st.plotly_chart(bike_walk_chart, use_container_width=True)
+    else:
+        st.write('Coming soon!')
+
 with comparison_tab:
-    st.plotly_chart(rides_chart, use_container_width=True)
+    st.plotly_chart(comparison_chart, use_container_width=True)
 
 st.divider()
 
