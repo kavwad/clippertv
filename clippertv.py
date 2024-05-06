@@ -106,7 +106,8 @@ with monthly_tab:
 
 with bike_walk_tab:
     if st.session_state.rider == 'K':
-        st.plotly_chart(bike_walk_chart, use_container_width=True)
+        # st.plotly_chart(bike_walk_chart, use_container_width=True)
+        st.write('Coming soon!')
     else:
         st.write('Coming soon!')
 

@@ -214,6 +214,8 @@ def create_cost_chart(pivot_month_cost):
 
 
 def create_bike_walk_chart(riders):
+    pass
+'''
     # if riders == ['K']:
     with open('/Users/kaveh/Library/Mobile Documents/iCloud~com~ifunography~HealthExport/Documents/Cycling Distance/HealthAutoExport-2023-10-23.json') as f:
         data = json.load(f)
@@ -244,6 +246,7 @@ def create_bike_walk_chart(riders):
     bike_walk_chart.update_traces(hovertemplate='<b>%{x|%b %d, %Y}</b>: %{y}')
         
     return bike_walk_chart
+'''
 
 
 def create_comparison_chart(riders):
