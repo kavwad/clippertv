@@ -143,9 +143,12 @@ def create_pivot_month_cost(df):
 
     if 'Caltrain Adult 3 Zone Monthly Pass' in df['Product'].unique():
         # Calculate monthly cost for Caltrain pass
-        caltrain_pass_monthly = (df[df['Product'] == 'Caltrain Adult 3 Zone Monthly Pass']
-                                .groupby(pd.Grouper(key='Transaction Date', freq='M'))['Debit']
-                                .sum().to_frame(('Debit', 'Caltrain Pass')))
+        caltrain_pass_monthly = (df[(df['Product'] == 'Caltrain Adult 3 Zone Monthly Pass')
+                                  & (df['Category'].str.contains('Reload'))]
+                                  .groupby(pd.Grouper(key='Transaction Date', freq='M'))['Credit']
+                                  .sum()
+                                  .to_frame(('Debit', 'Caltrain Pass'))
+                                  )
 
         # Add Caltrain pass cost to pivot table
         pivot_month_cost = pivot_month_cost.join(
