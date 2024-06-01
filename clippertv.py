@@ -63,12 +63,12 @@ if 'Caltrain Adult 3 Zone Monthly Pass' in this_month['Product'].values:
     pass_rides = this_month[(this_month['Category'].str.contains('Caltrain')).fillna(False)
                                    & (this_month['Transaction Type'] == 'Manual entry')]
 
-    pass_savings = len(pass_rides) * 7.70
+    pass_savings = - len(pass_rides) * 7.70
     pass_cost = 184.80
     additional_caltrain_cost = this_month[(this_month['Category'].str.contains('Caltrain')).fillna(False)][['Debit', 'Credit']].sum()
     additional_caltrain_cost = additional_caltrain_cost['Debit'] - additional_caltrain_cost['Credit']
     
-    pass_upshot = (pass_savings - pass_cost + additional_caltrain_cost).round(0).astype(int)
+    pass_upshot = (pass_savings + pass_cost + additional_caltrain_cost).round(0).astype(int)
 else:
     pass_upshot = None
 
