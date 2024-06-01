@@ -60,7 +60,8 @@ def categorize(df_import):
     df_import.loc[df_import['Route'] == 'NONE', 'Category'] = 'Muni Metro'
     df_import.loc[df_import['Location'] == 'SAM bus', 'Category'] = 'SamTrans'
     df_import.loc[(df_import['Transaction Type'] == 'Threshold auto-load at a TransLink Device')
-                  | (df_import['Transaction Type'] == 'Add value at TOT or TVM'), 'Category'] = 'Reload'
+                  | (df_import['Transaction Type'] == 'Add value at TOT or TVM')
+                  | (df_import['Transaction Type'] == 'Remote create of new pass'), 'Category'] = 'Reload'
 
     return df_import
 
