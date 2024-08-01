@@ -142,7 +142,9 @@ with comparison_tab:
     st.plotly_chart(comparison_chart, use_container_width=True)
 
 # Display add trips expander if logged in
-if st.experimental_user.email == st.secrets['admin']['email']:
+st.write(st.experimental_user.email)
+
+if st.experimental_user.email == st.secrets.admin.email:
     st.divider()
     with st.expander('Add trips'):
 
