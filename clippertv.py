@@ -141,111 +141,111 @@ with bike_walk_tab:
 with comparison_tab:
     st.plotly_chart(comparison_chart, use_container_width=True)
 
-st.divider()
+# Display add trips expander if logged in
+if st.experimental_user.email == st.secrets['admin']['email']:
+    st.divider()
+    with st.expander('Add trips'):
 
-# Display add trips expander
-with st.expander('Add trips'):
+        import_tab, manual_tab = st.tabs(['Import from pdf', 'Add manually'])
 
-    import_tab, manual_tab = st.tabs(['Import from pdf', 'Add manually'])
+        with import_tab:
+            pdfs = st.file_uploader('Upload Clipper activity pdf',
+                                    type='pdf',
+                                    accept_multiple_files=True,
+                                    label_visibility='collapsed')
 
-    with import_tab:
-        pdfs = st.file_uploader('Upload Clipper activity pdf',
-                                type='pdf',
-                                accept_multiple_files=True,
-                                label_visibility='collapsed')
+            if pdfs:  # submit appears only after upload
+                st.session_state.filenames = []
+                df_import = None
 
-        if pdfs:  # submit appears only after upload
-            st.session_state.filenames = []
-            df_import = None
+                if st.button('Process all'):
+                    progress_bar = st.progress(0, 'Uploading PDFs')
 
-            if st.button('Process all'):
-                progress_bar = st.progress(0, 'Uploading PDFs')
+                    for index, pdf in enumerate(pdfs):
+                        filename = f"{datetime.datetime.now().strftime('%Y%m%d_%H%M')}_{index+1}.pdf"
+                        upload_pdf(pdf, filename)
+                        progress_bar.progress(
+                            (index + 1) / len(pdfs), 'Uploading PDFs')
+                        st.session_state.filenames.append(filename)
 
-                for index, pdf in enumerate(pdfs):
-                    filename = f"{datetime.datetime.now().strftime('%Y%m%d_%H%M')}_{index+1}.pdf"
-                    upload_pdf(pdf, filename)
-                    progress_bar.progress(
-                        (index + 1) / len(pdfs), 'Uploading PDFs')
-                    st.session_state.filenames.append(filename)
+                    for filename in st.session_state.filenames:
+                        filepath = st.secrets['connections']['ccrma']['filepath_web'] + filename
+                        df_import = categorize(clean_up(get_trips(filepath)))
+                        check_category(df_import)
+                        st.session_state.df_import_all = add_trips_to_database(df, df_import)
 
-                for filename in st.session_state.filenames:
-                    filepath = st.secrets['connections']['ccrma']['filepath_web'] + filename
-                    df_import = categorize(clean_up(get_trips(filepath)))
-                    check_category(df_import)
-                    st.session_state.df_import_all = add_trips_to_database(df, df_import)
+                    progress_bar.empty()
 
-                progress_bar.empty()
-
-                st.write(st.session_state.df_import_all)
-            
-            if st.button('Submit all', key='import_submit', type='primary'):
-                save_to_gcs(st.session_state.rider,
-                            st.session_state.df_import_all)
-                st.success(f'Uploaded!', icon='🚍')
-                time.sleep(3)
-                st.rerun()
-
-    with manual_tab:
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            transaction_date = st.date_input('Date:', format='MM/DD/YYYY')
-        with col2:
-            category = st.selectbox('Mode:', options=DISP_CATEGORIES + ['Caltrain Pass'])
-        with col3:
-            rides = st.number_input('Rides:', min_value=1, step=1)
-
-        if 'new_rows' not in st.session_state:
-            st.session_state.new_rows = pd.DataFrame(columns=['Transaction Date',
-                                                              'Transaction Type',
-                                                              'Category'])
-
-        if st.button('Add ride(s)'):
-            for i in range(rides):
-                if category == 'Caltrain Pass':
-                    new_row = pd.DataFrame({
-                        'Transaction Date': [pd.Timestamp(transaction_date)],
-                        'Transaction Type': ['Manual entry'],
-                        'Product': 'Caltrain Adult 3 Zone Monthly Pass',
-                        'Credit': 184.80,
-                        'Category': ['Reload']
-                    })
-                else:
-                    new_row = pd.DataFrame({
-                        'Transaction Date': [pd.Timestamp(transaction_date)],
-                        'Transaction Type': ['Manual entry'],
-                        'Category': [SUBMIT_CATEGORIES[category]]
-                    })
-                st.session_state.new_rows = pd.concat(
-                    [st.session_state.new_rows, new_row])
-
-        # Display new_rows and submit button
-        if not st.session_state.new_rows.empty:
-            with st.container(border=True):
-                st.error('for K & B use only!', icon='🚨')
-
-                st.data_editor(st.session_state.new_rows,
-                               column_config={
-                                   '_index': None,
-                                   'Transaction Date': st.column_config.DateColumn(
-                                       label='Date',
-                                       format='MM/DD/YYYY'),
-                                   'Transaction Type': None,
-                                   'Category': 'Mode'})
-
-                # Undo button
-                if st.button('Remove last ride'):
-                    st.session_state.new_rows = st.session_state.new_rows.iloc[:-1]
-
-                # Submit button
-                if st.button('Submit all', key='manual_submit', type='primary'):
-                    df = (pd.concat([df, st.session_state.new_rows]).
-                          sort_values('Transaction Date', ascending=False).
-                          reset_index)(drop=True)
-
-                    save_to_gcs(st.session_state.rider, df)
-
-                    st.session_state.new_rows = pd.DataFrame(columns=['Transaction Date',
-                                                                      'Transaction Type',
-                                                                      'Category'])
-
+                    st.write(st.session_state.df_import_all)
+                
+                if st.button('Submit all', key='import_submit', type='primary'):
+                    save_to_gcs(st.session_state.rider,
+                                st.session_state.df_import_all)
+                    st.success(f'Uploaded!', icon='🚍')
+                    time.sleep(3)
                     st.rerun()
+
+        with manual_tab:
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                transaction_date = st.date_input('Date:', format='MM/DD/YYYY')
+            with col2:
+                category = st.selectbox('Mode:', options=DISP_CATEGORIES + ['Caltrain Pass'])
+            with col3:
+                rides = st.number_input('Rides:', min_value=1, step=1)
+
+            if 'new_rows' not in st.session_state:
+                st.session_state.new_rows = pd.DataFrame(columns=['Transaction Date',
+                                                                'Transaction Type',
+                                                                'Category'])
+
+            if st.button('Add ride(s)'):
+                for i in range(rides):
+                    if category == 'Caltrain Pass':
+                        new_row = pd.DataFrame({
+                            'Transaction Date': [pd.Timestamp(transaction_date)],
+                            'Transaction Type': ['Manual entry'],
+                            'Product': 'Caltrain Adult 3 Zone Monthly Pass',
+                            'Credit': 184.80,
+                            'Category': ['Reload']
+                        })
+                    else:
+                        new_row = pd.DataFrame({
+                            'Transaction Date': [pd.Timestamp(transaction_date)],
+                            'Transaction Type': ['Manual entry'],
+                            'Category': [SUBMIT_CATEGORIES[category]]
+                        })
+                    st.session_state.new_rows = pd.concat(
+                        [st.session_state.new_rows, new_row])
+
+            # Display new_rows and submit button
+            if not st.session_state.new_rows.empty:
+                with st.container(border=True):
+                    st.error('for K & B use only!', icon='🚨')
+
+                    st.data_editor(st.session_state.new_rows,
+                                column_config={
+                                    '_index': None,
+                                    'Transaction Date': st.column_config.DateColumn(
+                                        label='Date',
+                                        format='MM/DD/YYYY'),
+                                    'Transaction Type': None,
+                                    'Category': 'Mode'})
+
+                    # Undo button
+                    if st.button('Remove last ride'):
+                        st.session_state.new_rows = st.session_state.new_rows.iloc[:-1]
+
+                    # Submit button
+                    if st.button('Submit all', key='manual_submit', type='primary'):
+                        df = (pd.concat([df, st.session_state.new_rows]).
+                            sort_values('Transaction Date', ascending=False).
+                            reset_index)(drop=True)
+
+                        save_to_gcs(st.session_state.rider, df)
+
+                        st.session_state.new_rows = pd.DataFrame(columns=['Transaction Date',
+                                                                        'Transaction Type',
+                                                                        'Category'])
+
+                        st.rerun()
