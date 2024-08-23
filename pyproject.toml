@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "clippertv"
+version = "0.1.0"
+description = ""
+authors = ["kavwad <123405488+kavwad@users.noreply.github.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+camelot-py = "^0.11.0"
+gcsfs = "^2024.6.1"
+plotly = "^5.23.0"
+streamlit = "^1.37.0"
+opencv-python = "^4.10.0.84"
+paramiko = "^3.4.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
