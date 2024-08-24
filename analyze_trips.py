@@ -65,7 +65,7 @@ def create_pivot_year(df):
 
 
 def create_pivot_month(df):
-    pivot_month = (df.groupby([pd.Grouper(key='Transaction Date', freq='M'), 'Category'])
+    pivot_month = (df.groupby([pd.Grouper(key='Transaction Date', freq='ME'), 'Category'])
                    .size()
                    .unstack(fill_value=0)
                    )
@@ -136,7 +136,7 @@ def create_pivot_year_cost(df):
 
 def create_pivot_month_cost(df):
     # Create pivot table by month and category
-    pivot_month_cost = (df.groupby([pd.Grouper(key='Transaction Date', freq='M'), 'Category'])[['Debit', 'Credit']]
+    pivot_month_cost = (df.groupby([pd.Grouper(key='Transaction Date', freq='ME'), 'Category'])[['Debit', 'Credit']]
                         .sum()
                         .unstack(fill_value=0)
                         )
@@ -145,7 +145,7 @@ def create_pivot_month_cost(df):
         # Calculate monthly cost for Caltrain pass
         caltrain_pass_monthly = (df[(df['Product'] == 'Caltrain Adult 3 Zone Monthly Pass')
                                   & (df['Category'].str.contains('Reload'))]
-                                  .groupby(pd.Grouper(key='Transaction Date', freq='M'))['Credit']
+                                  .groupby(pd.Grouper(key='Transaction Date', freq='ME'))['Credit']
                                   .sum()
                                   .to_frame(('Debit', 'Caltrain Pass'))
                                   )
@@ -227,7 +227,7 @@ def create_bike_walk_chart(riders):
     bike_walk_df['name'] = bike_walk_df['name'].str.replace('cycling_distance', 'Cycling')
 
     # Group by 'name' and 'date' and then resample. Ensure 'name' stays as a column.
-    monthly_sum_by_activity = bike_walk_df.groupby(['name', pd.Grouper(key='date', freq='M')])['qty'].sum().reset_index()
+    monthly_sum_by_activity = bike_walk_df.groupby(['name', pd.Grouper(key='date', freq='ME')])['qty'].sum().reset_index()
 
     # Convert the 'date' from Period to Timestamp if needed
     monthly_sum_by_activity['date'] = monthly_sum_by_activity['date'].dt.to_period('M').dt.start_time
