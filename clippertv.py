@@ -151,7 +151,7 @@ def get_user_group(email):
 user_group = get_user_group(st.experimental_user.email)
 
 # Display add trips expander if logged in
-if user_group == "admin" or st.session_state.rider in user_group:
+if user_group == "admin" or (user_group and st.session_state.rider in user_group):
     st.divider()
     with st.expander('Add trips'):
 
