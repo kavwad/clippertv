@@ -141,10 +141,15 @@ with bike_walk_tab:
 with comparison_tab:
     st.plotly_chart(comparison_chart, use_container_width=True)
 
-# Display add trips expander if logged in
-st.write(st.experimental_user.email)
+def get_user_group(email):
+    for group, users in st.secrets.whitelist.items():
+        if email in users:
+            return group
+    return None
+user_group = get_user_group(st.experimental_user.email)
 
-if st.experimental_user.email == st.secrets.admin.email:
+# Display add trips expander if logged in
+if user_group == "admin" or (user_group and st.session_state.rider in user_group):
     st.divider()
     with st.expander('Add trips'):
 
