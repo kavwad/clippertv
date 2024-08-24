@@ -78,10 +78,11 @@ f"#### {st.session_state.rider} took **:red[{trips_this_month}]** trips in\
     {pivot_month.index[0].strftime('%B')}, which cost\
     **:red[${cost_this_month}]**."
 
-f"{st.session_state.rider} rode **{pivot_month.iloc[0].idxmax()}** most, at\
-    **{pivot_month.iloc[0][pivot_month.iloc[0].idxmax()]}** times.\
-    Altogether, {st.session_state.rider} took {abs(trip_diff)} {trip_diff_text} trips and paid\
-        ${abs(cost_diff)} {cost_diff_text} than the previous month."
+if len(pivot_month) > 1:
+    f"{st.session_state.rider} rode **{pivot_month.iloc[0].idxmax()}** most, at\
+        **{pivot_month.iloc[0][pivot_month.iloc[0].idxmax()]}** times.\
+        Altogether, {st.session_state.rider} took {abs(trip_diff)} {trip_diff_text} trips and paid\
+            ${abs(cost_diff)} {cost_diff_text} than the previous month."
 
 if pass_upshot:
     if pass_upshot < 0:

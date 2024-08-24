@@ -111,13 +111,14 @@ def create_pivot_year_cost(df):
                                                   + pivot_year_cost[('Debit', 'Caltrain Pass')]
                                                   - pivot_year_cost[('Credit', 'Caltrain Exit')])
 
-    else:
+    elif 'Caltrain' in df['Category']:
         pivot_year_cost[('Debit', 'Caltrain')] = (pivot_year_cost[('Debit', 'Caltrain Entrance')]
                                                   - pivot_year_cost[('Credit', 'Caltrain Exit')])
 
-    pivot_year_cost[('Debit', 'Ferry')] = (pivot_year_cost[('Debit', 'Ferry Entrance')]
-                                           + pivot_year_cost[('Debit', 'Ferry Exit')]
-                                           - pivot_year_cost[('Credit', 'Ferry Exit')])
+    if 'Ferry' in df['Category']:
+        pivot_year_cost[('Debit', 'Ferry')] = (pivot_year_cost[('Debit', 'Ferry Entrance')]
+                                               + pivot_year_cost[('Debit', 'Ferry Exit')]
+                                               - pivot_year_cost[('Credit', 'Ferry Exit')])
 
     # Drop credit columns
     pivot_year_cost = pivot_year_cost['Debit']
@@ -159,13 +160,14 @@ def create_pivot_month_cost(df):
                                                 + pivot_month_cost[('Debit', 'Caltrain Pass')]
                                                 - pivot_month_cost[('Credit', 'Caltrain Exit')])
     
-    else:
+    elif 'Caltrain' in df['Category']:
         pivot_month_cost[('Debit', 'Caltrain')] = (pivot_month_cost[('Debit', 'Caltrain Entrance')]
                                                    - pivot_month_cost[('Credit', 'Caltrain Exit')])
     
-    pivot_month_cost[('Debit', 'Ferry')] = (pivot_month_cost[('Debit', 'Ferry Entrance')]
-                                            + pivot_month_cost[('Debit', 'Ferry Exit')]
-                                            - pivot_month_cost[('Credit', 'Ferry Exit')])
+    if 'Ferry' in df['Category']:
+        pivot_month_cost[('Debit', 'Ferry')] = (pivot_month_cost[('Debit', 'Ferry Entrance')]
+                                                + pivot_month_cost[('Debit', 'Ferry Exit')]
+                                                - pivot_month_cost[('Credit', 'Ferry Exit')])
 
     # Drop credit columns
     pivot_month_cost = pivot_month_cost['Debit']
