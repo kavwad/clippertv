@@ -32,7 +32,7 @@ COLUMN_CONFIG = {'Year': st.column_config.NumberColumn(format="%d", width=75),
 st.set_page_config(page_title="ClipperTV", layout='wide')
 
 # Set up title and rider chooser
-riders = ['B', 'K']
+riders = ['B', 'K', 'O', 'S']
 st.session_state.rider = st.radio('Choose your rider',
                                   riders,
                                   horizontal=True,
@@ -42,18 +42,19 @@ st.title('Welcome to Clipper TV!', anchor=False)
 # Load and process data
 df = load_data(st.session_state.rider)
 pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(df)
-trip_chart, cost_chart, bike_walk_chart, comparison_chart = create_charts(pivot_month, pivot_month_cost, riders)
+trip_chart, cost_chart, bike_walk_chart, comparison_chart = create_charts(pivot_month, pivot_month_cost, riders, st.session_state.rider)
 
 # Caculate summary stats summary
 trips_this_month = pivot_month.iloc[0].sum()
 cost_this_month = pivot_month_cost.iloc[0].sum().round().astype(int)
 
-trip_diff = pivot_month.iloc[1].sum() - pivot_month.iloc[0].sum()
-trip_diff_text = "fewer" if trip_diff >= 0 else "more"
+if len(pivot_month) > 1:
+    trip_diff = pivot_month.iloc[1].sum() - pivot_month.iloc[0].sum()
+    trip_diff_text = "fewer" if trip_diff >= 0 else "more"
 
-cost_diff = (pivot_month_cost.iloc[1].sum()
-             - pivot_month_cost.iloc[0].sum()).round().astype(int)
-cost_diff_text = "less" if cost_diff >= 0 else "more"
+    cost_diff = (pivot_month_cost.iloc[1].sum()
+                 - pivot_month_cost.iloc[0].sum()).round().astype(int)
+    cost_diff_text = "less" if cost_diff >= 0 else "more"
 
 most_recent_date = df['Transaction Date'].max()
 this_month = df[((df['Transaction Date'].dt.year == most_recent_date.year)

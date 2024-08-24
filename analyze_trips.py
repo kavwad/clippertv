@@ -36,11 +36,11 @@ def process_data(df):
     return pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers
 
 
-def create_charts(pivot_month, pivot_month_cost, riders):
+def create_charts(pivot_month, pivot_month_cost, riders, rider):
     trip_chart = create_trip_chart(pivot_month)
     cost_chart = create_cost_chart(pivot_month_cost)
     bike_walk_chart = create_bike_walk_chart(riders)
-    comparison_chart = create_comparison_chart(riders)
+    comparison_chart = create_comparison_chart(riders, rider)
     return trip_chart, cost_chart, bike_walk_chart, comparison_chart
 
 def create_pivot_year(df):
@@ -249,15 +249,21 @@ def create_bike_walk_chart(riders):
 '''
 
 
-def create_comparison_chart(riders):
+def create_comparison_chart(riders, rider):
     comparison_chart = go.Figure()
+    riders = ['B', 'K'] if rider in ['B', 'K'] else ['O', 'S']
     for rider in riders:
         df = load_data(rider)
         total_rides_per_month = create_pivot_month(df).sum(axis=1)
         total_rides_per_month.index = pd.to_datetime(
             total_rides_per_month.index, format='%b %Y')
 
-        chart_colors = {'K': COLOR_MAP['Muni Metro'], 'B': COLOR_MAP['AC Transit']}
+        chart_colors = {
+            'K': COLOR_MAP['Muni Metro'],
+            'B': COLOR_MAP['AC Transit'],
+            'O': COLOR_MAP['Muni Metro'],
+            'S': COLOR_MAP['AC Transit'],
+        }
         comparison_chart.add_trace(go.Scatter(x=total_rides_per_month.index,
                                               y=total_rides_per_month,
                                               mode='lines',
