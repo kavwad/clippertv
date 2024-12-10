@@ -251,19 +251,41 @@ def create_bike_walk_chart(riders):
 
 def create_comparison_chart(riders):
     comparison_chart = go.Figure()
+    
+    start_date = None
+    latest_date = None
+    
+    # Find the overall date range across all riders
+    for rider in riders:
+        df = load_data(rider)
+        rider_first_date = df['Transaction Date'].min()
+        rider_last_date = df['Transaction Date'].max()
+        
+        if start_date is None or rider_first_date < start_date:
+            start_date = rider_first_date
+        if latest_date is None or rider_last_date > latest_date:
+            latest_date = rider_last_date
+    
+    # Adjust start_date to beginning of month and latest_date to end of month
+    start_date = start_date.to_period('M').to_timestamp(how='start')
+    latest_date = latest_date.to_period('M').to_timestamp(how='end')
+    
+    # Create complete monthly index from start to latest month
+    complete_index = pd.date_range(start=start_date, end=latest_date, freq='MS')
+    
     for rider in riders:
         df = load_data(rider)
         total_rides_per_month = create_pivot_month(df).sum(axis=1)
-        total_rides_per_month.index = pd.to_datetime(
-            total_rides_per_month.index, format='%b %Y')
+        total_rides_per_month.index = pd.to_datetime(total_rides_per_month.index, format='%b %Y').to_period('M').to_timestamp(how='start')
+        total_rides_per_month = total_rides_per_month.reindex(complete_index, fill_value=0)
 
         chart_colors = {'K': COLOR_MAP['Muni Metro'], 'B': COLOR_MAP['AC Transit']}
         comparison_chart.add_trace(go.Scatter(x=total_rides_per_month.index,
-                                              y=total_rides_per_month,
-                                              mode='lines',
-                                              name=rider,
-                                              line_color=chart_colors[rider],
-                                              line_shape='spline'))
+                                            y=total_rides_per_month,
+                                            mode='lines',
+                                            name=rider,
+                                            line_color=chart_colors[rider],
+                                            line_shape='spline'))
 
     comparison_chart.update_layout(title_text='Trips per month',
                                    yaxis_title='Trips',
