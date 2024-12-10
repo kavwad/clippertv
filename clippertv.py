@@ -16,17 +16,18 @@ SUBMIT_CATEGORIES = {'Muni Bus': 'Muni Bus', 'Muni Metro': 'Muni Metro',
                      'Caltrain': 'Caltrain Entrance', 'Ferry': 'Ferry Entrance',
                      'AC Transit': 'AC Transit', 'SamTrans': 'SamTrans'}
 
-COLUMN_CONFIG = {'Year': st.column_config.NumberColumn(format="%d", width=75),
-                 'Month': st.column_config.DateColumn(format="MMM YYYY", width=75),
-                 'Muni Bus': st.column_config.NumberColumn(format="$%d"),
-                 'Muni Metro': st.column_config.NumberColumn(format="$%d"),
-                 'BART': st.column_config.NumberColumn(format="$%d"),
-                 'Cable Car': st.column_config.NumberColumn(format="$%d"),
-                 'Caltrain': st.column_config.NumberColumn(format="$%d"),
-                 'Ferry': st.column_config.NumberColumn(format="$%d"),
-                 'AC Transit': st.column_config.NumberColumn(format="$%d"),
-                 'SamTrans': st.column_config.NumberColumn(format="$%d"),
-                 }
+COLUMN_CONFIG = {
+    'Year': st.column_config.NumberColumn(format="%d", width=75),
+    'Month': st.column_config.DateColumn(format="MMM YYYY", width=75),
+    'Muni Bus': st.column_config.NumberColumn(format="$%d"),
+    'Muni Metro': st.column_config.NumberColumn(format="$%d"),
+    'BART': st.column_config.NumberColumn(format="$%d"),
+    'Cable Car': st.column_config.NumberColumn(format="$%d"),
+    'Caltrain': st.column_config.NumberColumn(format="$%d"),
+    'Ferry': st.column_config.NumberColumn(format="$%d"),
+    'AC Transit': st.column_config.NumberColumn(format="$%d"),
+    'SamTrans': st.column_config.NumberColumn(format="$%d"),
+ }
 
 # Set up the page
 st.set_page_config(page_title="ClipperTV", layout='wide')
@@ -141,11 +142,14 @@ with bike_walk_tab:
 with comparison_tab:
     st.plotly_chart(comparison_chart, use_container_width=True)
 
+
 def get_user_group(email):
     for group, users in st.secrets.whitelist.items():
         if email in users:
             return group
     return None
+
+
 user_group = get_user_group(st.experimental_user.email)
 st.write(st.experimental_user.email)
 st.write(user_group)
