@@ -143,22 +143,10 @@ with comparison_tab:
     st.plotly_chart(comparison_chart, use_container_width=True)
 
 
-def get_user_group(email):
-    for group, users in st.secrets.whitelist.items():
-        if email in users:
-            return group
-    return None
-
-
-user_group = get_user_group(st.experimental_user.email)
-print(st.experimental_user.email)
-print(user_group)
-
-# Display add trips expander if logged in
-if user_group == "admin" or (user_group and st.session_state.rider in user_group):
-    st.divider()
-    with st.expander('Add trips'):
-
+st.divider()
+with st.expander('Add trips'):
+    password = st.text_input('Enter password', type='password')
+    if password == st.secrets['password']:
         import_tab, manual_tab = st.tabs(['Import from pdf', 'Add manually'])
 
         with import_tab:
