@@ -9,6 +9,7 @@ ClipperTV is a Streamlit-based dashboard for visualizing Clipper card transit da
 - View monthly and yearly transit statistics
 - Compare transit usage between riders
 - Visualize transit usage with interactive charts
+- Store data in Supabase or Google Cloud Storage
 
 ## Project Structure
 
@@ -19,9 +20,12 @@ clippertv/
 │       ├── app.py         # Main Streamlit app
 │       ├── config.py      # Configuration management
 │       ├── data/
-│       │   ├── models.py  # Data models
-│       │   ├── store.py   # Data access layer
-│       │   └── schema.py  # Database schema
+│       │   ├── models.py         # Data models
+│       │   ├── store.py          # GCS data storage
+│       │   ├── supabase_store.py # Supabase data storage
+│       │   ├── factory.py        # Data store factory
+│       │   ├── schema.py         # Database schema
+│       │   └── migrate_to_supabase.py # Migration tool
 │       ├── pdf/
 │       │   ├── extractor.py   # PDF extraction logic
 │       │   └── processor.py   # Processing logic
@@ -40,6 +44,25 @@ clippertv/
 pip install -e .
 ```
 
+3. Configure environment:
+   - Copy `.env.example` to `.env` and update with your credentials
+   - For Streamlit Cloud, set up the secrets in `.streamlit/secrets.toml`
+
+## Supabase Integration
+
+ClipperTV now supports storing data in Supabase, a modern PostgreSQL database with a REST API. 
+
+To use Supabase:
+
+1. Create a Supabase project at https://supabase.com
+2. Set your Supabase URL and API key in the environment or secrets
+3. Set `CLIPPERTV_STORAGE=supabase` to use Supabase instead of GCS
+4. Run the migration script to transfer existing data:
+
+```bash
+python -m clippertv.data.migrate_to_supabase
+```
+
 ## Usage
 
 Run the application with:
@@ -56,9 +79,24 @@ clippertv
 
 ## Configuration
 
-The application requires configuration for:
-- Google Cloud Storage access for data storage
-- CCRMA server access for PDF processing
-- Password protection for adding trips
+The application can be configured with:
 
-Store your credentials in `.streamlit/secrets.toml`.
+### Environment Variables
+- `CLIPPERTV_STORAGE`: Set to `supabase` or `gcs` to choose backend
+- `SUPABASE_URL`: Your Supabase project URL
+- `SUPABASE_API_KEY`: Your Supabase API key
+
+### Streamlit Secrets
+Store the following in `.streamlit/secrets.toml`:
+
+```toml
+# For Google Cloud Storage
+gcs_key = '''{ "GCS JSON credentials" }'''
+
+# For Supabase
+supabase_url = "your-project-url.supabase.co"
+supabase_key = "your-supabase-api-key"
+
+# App protection
+password = "your-password-for-adding-trips"
+```

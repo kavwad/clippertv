@@ -8,6 +8,12 @@
 - Format code: `black src/ tests/`
 - Type check: `mypy src/`
 
+### Supabase Commands
+- Check Supabase setup: `python -m clippertv.data.supabase_info`
+- Show Supabase setup instructions: `python -m clippertv.data.migrate_to_supabase --setup-only`
+- Migrate data to Supabase: `python -m clippertv.data.migrate_to_supabase`
+- Toggle storage backend: `CLIPPERTV_STORAGE=supabase python run_app.py`
+
 ## Code Style
 - **Imports**: Group imports in order: standard library, third-party, local
 - **Types**: Use type hints with all function signatures (typing module)
@@ -21,6 +27,23 @@
 
 ## Architecture
 - Data layer (models, storage) in `data/` module
+  - `models.py`: Pydantic data models
+  - `schema.py`: Database schema definitions
+  - `store.py`: Google Cloud Storage implementation
+  - `supabase_store.py`: Supabase implementation
+  - `factory.py`: Data store factory (selects appropriate implementation)
+  - `migrate_to_supabase.py`: Migration tool
 - PDF processing in `pdf/` module
 - Visualization components in `viz/` module
 - Main app in `app.py`
+
+## Data Storage
+- **Google Cloud Storage**: Original implementation
+  - CSV files stored in GCS bucket
+  - Each rider has dedicated CSV file
+  - Configured via Streamlit secrets
+- **Supabase**: New implementation
+  - PostgreSQL database with REST API
+  - Relational model: Riders, Transit Modes, Trips
+  - Configured via environment variables or Streamlit secrets
+  - Migration script for transferring data from GCS

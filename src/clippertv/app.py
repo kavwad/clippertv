@@ -1,12 +1,13 @@
 """Main Streamlit app for ClipperTV."""
 
 import datetime
+import json
 import time
 import pandas as pd
 import streamlit as st
 
 from clippertv.config import config
-from clippertv.data.store import data_store
+from clippertv.data.factory import get_data_store
 from clippertv.pdf.processor import process_pdf_statements, categorize_trips
 from clippertv.viz.charts import (
     create_trip_chart, 
@@ -40,6 +41,13 @@ def rider_selector():
 
 def load_and_process_rider_data(rider):
     """Load rider data and process it for display."""
+    # Get data store instance from the current function scope
+    data_store = st.session_state.get("data_store")
+    if data_store is None:
+        # Initialize if not available
+        data_store = initialize_data_store()
+        st.session_state["data_store"] = data_store
+    
     # Load data from data store
     df = data_store.load_data(rider)
     
@@ -65,6 +73,12 @@ def display_add_trips_section(rider):
 
 def display_pdf_import_section(rider):
     """Display the PDF import section."""
+    # Get data store from session state
+    data_store = st.session_state.get("data_store")
+    if data_store is None:
+        data_store = initialize_data_store()
+        st.session_state["data_store"] = data_store
+    
     pdfs = st.file_uploader(
         'Upload Clipper activity pdf',
         type='pdf',
@@ -93,6 +107,12 @@ def display_pdf_import_section(rider):
 
 def display_manual_entry_section(rider):
     """Display the manual entry section."""
+    # Get data store from session state
+    data_store = st.session_state.get("data_store")
+    if data_store is None:
+        data_store = initialize_data_store()
+        st.session_state["data_store"] = data_store
+    
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -176,9 +196,31 @@ def display_manual_entry_section(rider):
                 st.rerun()
 
 
+def initialize_data_store():
+    """Initialize the data store based on configuration."""
+    # Get GCS credentials from Streamlit secrets if available
+    gcs_key = None
+    if "gcs_key" in st.secrets:
+        try:
+            gcs_key = json.loads(st.secrets["gcs_key"])
+        except (json.JSONDecodeError, KeyError):
+            st.error("Error loading GCS credentials from secrets.")
+    
+    # Create and return the appropriate data store
+    return get_data_store(gcs_key)
+
+
 def main():
     """Run the ClipperTV Streamlit app."""
     setup_page()
+    
+    # Initialize data store and save it in session state
+    data_store = initialize_data_store()
+    st.session_state["data_store"] = data_store
+    
+    # Show storage backend indicator (can be removed in production)
+    storage_type = "Supabase" if config.storage.use_supabase else "Google Cloud Storage"
+    st.sidebar.info(f"Using {storage_type} backend")
     
     # Select rider
     rider = rider_selector()

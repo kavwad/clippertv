@@ -1,6 +1,7 @@
 """Configuration management for ClipperTV."""
 
-from typing import Dict, List
+import os
+from typing import Dict, List, Literal
 from pydantic import BaseModel, Field
 
 class TransitCategories(BaseModel):
@@ -48,6 +49,32 @@ class TransitCategories(BaseModel):
         'SamTrans': '#D3D3D3'
     }
 
+class StorageConfig(BaseModel):
+    """Configuration for data storage."""
+    
+    # Storage type
+    storage_type: Literal["gcs", "supabase"] = Field(
+        default="gcs",
+        description="Storage backend to use"
+    )
+    
+    # Google Cloud Storage
+    gcs_bucket: str = "clippertv_data"
+    gcs_file_template: str = "data_{}.csv"  # Format with rider name
+    
+    @property
+    def use_supabase(self) -> bool:
+        """Check if Supabase storage should be used."""
+        # Check environment variable first
+        env_storage = os.environ.get("CLIPPERTV_STORAGE", "").lower()
+        if env_storage == "supabase":
+            return True
+        if env_storage == "gcs":
+            return False
+        
+        # Fall back to configured value
+        return self.storage_type == "supabase"
+
 class AppConfig(BaseModel):
     """Main application configuration."""
     
@@ -55,8 +82,13 @@ class AppConfig(BaseModel):
     app_title: str = "ClipperTV"
     
     # Data storage
-    data_bucket: str = "clippertv_data"
-    data_file_template: str = "data_{}.csv"  # Format with rider name
+    storage: StorageConfig = StorageConfig()
+    
+    # Legacy storage config (for backward compatibility)
+    data_bucket: str = Field(default="clippertv_data", 
+                           description="Legacy field, use storage.gcs_bucket instead")
+    data_file_template: str = Field(default="data_{}.csv", 
+                                  description="Legacy field, use storage.gcs_file_template instead")
     
     # Available riders
     riders: List[str] = ["B", "K"]
@@ -74,6 +106,7 @@ class AppConfig(BaseModel):
     def __init__(self, **data):
         super().__init__(**data)
         self._setup_column_config()
+        self._sync_legacy_fields()
     
     def _setup_column_config(self):
         """Initialize column configuration for Streamlit data displays."""
@@ -87,6 +120,15 @@ class AppConfig(BaseModel):
         # Add column configs for each transit category
         for category in self.transit_categories.display_categories:
             self.column_config[category] = st.column_config.NumberColumn(format="$%d")
+    
+    def _sync_legacy_fields(self):
+        """Synchronize legacy fields with new structure for backward compatibility."""
+        # Sync from legacy to new structure
+        if self.data_bucket != self.storage.gcs_bucket:
+            self.storage.gcs_bucket = self.data_bucket
+            
+        if self.data_file_template != self.storage.gcs_file_template:
+            self.storage.gcs_file_template = self.data_file_template
 
 
 # Create global config instance
