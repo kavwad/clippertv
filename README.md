@@ -9,23 +9,27 @@ ClipperTV is a Streamlit-based dashboard for visualizing Clipper card transit da
 - View monthly and yearly transit statistics
 - Compare transit usage between riders
 - Visualize transit usage with interactive charts
-- Store data in Supabase or Google Cloud Storage
+- Store data in Turso (default) or Supabase
 
 ## Project Structure
 
 ```
 clippertv/
+├── docs/
+│   ├── dev-notes.md      # Developer workflow references
+│   └── project-plan.md   # Modernization roadmap
 ├── src/
 │   └── clippertv/
 │       ├── app.py         # Main Streamlit app
 │       ├── config.py      # Configuration management
 │       ├── data/
-│       │   ├── models.py         # Data models
-│       │   ├── store.py          # GCS data storage
-│       │   ├── supabase_store.py # Supabase data storage
 │       │   ├── factory.py        # Data store factory
+│       │   ├── migrate_to_turso.py # Supabase → Turso migration
+│       │   ├── models.py         # Data models
 │       │   ├── schema.py         # Database schema
-│       │   └── migrate_to_supabase.py # Migration tool
+│       │   ├── store.py          # Legacy GCS data storage
+│       │   ├── turso_client.py   # Turso connection helpers
+│       │   └── turso_store.py    # Turso data storage
 │       ├── pdf/
 │       │   ├── extractor.py   # PDF extraction logic
 │       │   └── processor.py   # Processing logic
@@ -38,10 +42,10 @@ clippertv/
 ## Installation
 
 1. Clone the repository
-2. Install the package:
+2. Create a virtual environment (optional) and install dependencies with [uv](https://github.com/astral-sh/uv):
 
 ```bash
-pip install -e .
+uv sync
 ```
 
 3. Configure environment:
@@ -50,17 +54,17 @@ pip install -e .
 
 ## Supabase Integration
 
-ClipperTV now supports storing data in Supabase, a modern PostgreSQL database with a REST API. 
+ClipperTV can still read from Supabase snapshots when needed.
 
 To use Supabase:
 
 1. Create a Supabase project at https://supabase.com
 2. Set your Supabase URL and API key in the environment or secrets
-3. Set `CLIPPERTV_STORAGE=supabase` to use Supabase instead of GCS
+3. Set `CLIPPERTV_STORAGE=supabase` to use Supabase instead of Turso
 4. Run the migration script to transfer existing data:
 
 ```bash
-python -m clippertv.data.migrate_to_supabase
+uv run python -m clippertv.data.migrate_to_turso supabase_export.backup
 ```
 
 ## Usage
@@ -68,13 +72,13 @@ python -m clippertv.data.migrate_to_supabase
 Run the application with:
 
 ```bash
-python -m streamlit run -m clippertv.app
+uv run streamlit run src/clippertv/app.py
 ```
 
 or use the script entry point:
 
 ```bash
-clippertv
+uv run clippertv
 ```
 
 ## Configuration
@@ -82,9 +86,11 @@ clippertv
 The application can be configured with:
 
 ### Environment Variables
-- `CLIPPERTV_STORAGE`: Set to `supabase` or `gcs` to choose backend
+- `CLIPPERTV_STORAGE`: Set to `turso` (default) or `gcs` to choose backend
 - `SUPABASE_URL`: Your Supabase project URL
 - `SUPABASE_API_KEY`: Your Supabase API key
+- `TURSO_DATABASE_URL`: Turso connection string
+- `TURSO_AUTH_TOKEN`: Turso auth token
 
 ### Streamlit Secrets
 Store the following in `.streamlit/secrets.toml`:
@@ -100,3 +106,7 @@ supabase_key = "your-supabase-api-key"
 # App protection
 password = "your-password-for-adding-trips"
 ```
+
+## Backups and sample data
+
+Local backups, data exports, and PDF samples now live under `backups/`, which is ignored by Git to keep the repository lean. Store any large exports or sensitive files there.

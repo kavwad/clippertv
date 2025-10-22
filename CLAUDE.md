@@ -1,17 +1,17 @@
 # ClipperTV Development Guide
 
 ## Commands
-- Run app: `python run_app.py` or `streamlit run src/clippertv/app.py`
-- Install dev: `pip install -e .`
+- Run app: `uv run python run_app.py` or `uv run streamlit run src/clippertv/app.py`
+- Install dev: `uv sync`
 - Run tests: `pytest tests/` (future)
-- Run single test: `pytest tests/path_to_test.py::test_function_name` (future)
-- Format code: `black src/ tests/`
-- Type check: `mypy src/`
+- Run single test: `uv run pytest tests/path_to_test.py::test_function_name` (future)
+- Format code: `uv run black src/ tests/`
+- Type check: `uv run mypy src/`
 
 ### Turso Commands
-- Migrate from Supabase backup: `python -m clippertv.data.migrate_to_turso [backup_file]`
-- Dry run migration: `python -m clippertv.data.migrate_to_turso --dry-run`
-- Toggle storage backend: `CLIPPERTV_STORAGE=turso python run_app.py`
+- Migrate from Supabase backup: `uv run python -m clippertv.data.migrate_to_turso [backup_file]`
+- Dry run migration: `uv run python -m clippertv.data.migrate_to_turso --dry-run`
+- Toggle storage backend: `CLIPPERTV_STORAGE=turso uv run python run_app.py`
 - Required env vars: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
 
 ## Code Style
@@ -37,16 +37,3 @@
 - PDF processing in `pdf/` module
 - Visualization components in `viz/` module
 - Main app in `app.py`
-
-## Data Storage
-- **Google Cloud Storage**: Legacy CSV-based implementation
-  - CSV files stored in GCS bucket
-  - Each rider has dedicated CSV file
-  - Configured via Streamlit secrets
-- **Turso**: LibSQL/SQLite-based implementation (CURRENT)
-  - Edge database built on SQLite
-  - Relational model: Riders, Transit Modes, Trips
-  - No auto-pause on free tier
-  - 5GB storage, 500M row reads/month free
-  - Configured via `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`
-  - Direct remote connection for simplicity

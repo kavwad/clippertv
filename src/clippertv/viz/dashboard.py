@@ -307,14 +307,14 @@ def setup_dashboard_tabs(pivot_year, pivot_month, pivot_year_cost, pivot_month_c
         st.subheader('Annual trips by mode', anchor=False)
         st.dataframe(
             pivot_year,
-            use_container_width=True,
+            width="stretch",
             column_config={'Year': st.column_config.NumberColumn(format="%d", width=75)}
         )
         
         st.subheader('Annual trip cost by mode', anchor=False)
         st.dataframe(
             pivot_year_cost,
-            use_container_width=True,
+            width="stretch",
             column_config=config.column_config
         )
     
@@ -323,21 +323,21 @@ def setup_dashboard_tabs(pivot_year, pivot_month, pivot_year_cost, pivot_month_c
         st.subheader('Monthly trips by mode', anchor=False)
         st.dataframe(
             pivot_month,
-            use_container_width=True,
+            width="stretch",
             column_config={'Month': st.column_config.DateColumn(format="MMM YYYY", width=75)}
         )
         
         st.subheader('Monthly trip cost by mode', anchor=False)
         st.dataframe(
             pivot_month_cost,
-            use_container_width=True,
+            width="stretch",
             column_config=config.column_config
         )
     
     # Bike/walk tab
     with bike_walk_tab:
         if rider == 'K':
-            # st.plotly_chart(bike_walk_chart, use_container_width=True)
+            # st.plotly_chart(bike_walk_chart, width="stretch",)
             st.write('Coming soon!')
         else:
             st.write('Coming soon!')
