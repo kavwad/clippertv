@@ -1,13 +1,15 @@
 """PDF processing functions for ClipperTV."""
 
 import datetime
-from io import BytesIO
 import json
-from typing import Optional, List
+import os
+import re
+import shutil
+import sys
+from pathlib import Path
+from typing import IO, Optional, Union, Iterable, List
 
 import pandas as pd
-import paramiko
-import streamlit as st
 
 from clippertv.config import config
 from clippertv.data.factory import get_data_store
@@ -91,58 +93,76 @@ def validate_categories(df_import):
     return True
 
 
-def upload_pdf_to_ccrma(pdf_file, filename):
-    """Upload PDF file to CCRMA server."""
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    
-    try:
-        # Connect to CCRMA server
-        ssh.connect(
-            hostname=st.secrets['connections']['ccrma']['hostname'],
-            username=st.secrets['connections']['ccrma']['username'],
-            password=st.secrets['connections']['ccrma']['password']
-        )
-
-        # Open SFTP connection and upload file
-        sftp = ssh.open_sftp()
-        sftp.putfo(
-            BytesIO(pdf_file.read()),
-            st.secrets['connections']['ccrma']['filepath'] + filename
-        )
-        sftp.close()
-    except Exception as e:
-        raise RuntimeError(f"Failed to upload PDF '{filename}' to CCRMA: {e}")
-    finally:
-        ssh.close()
+PDFSource = Union[str, os.PathLike, IO[bytes]]
 
 
-def process_pdf_statements(pdf_files, rider_id):
+def _sanitize_name(name: str) -> str:
+    """Return a filesystem-safe stem derived from the provided name."""
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "-", name).strip("-._")
+    return stem or "clipper-statement"
+
+
+def _persist_pdf(source: PDFSource, destination_dir: Path, suffix: str) -> Path:
+    """Persist a PDF to the local cache directory and return its path."""
+    destination_dir.mkdir(parents=True, exist_ok=True)
+
+    if isinstance(source, (str, os.PathLike)):
+        source_path = Path(source)
+        if not source_path.exists():
+            raise FileNotFoundError(f"PDF source does not exist: {source_path}")
+        stem = _sanitize_name(source_path.stem)
+        destination = destination_dir / f"{stem}-{suffix}.pdf"
+        if source_path.resolve() == destination.resolve():
+            data = destination.read_bytes()
+        else:
+            shutil.copy2(source_path, destination)
+            data = destination.read_bytes()
+    else:
+        name = getattr(source, "name", "clipper-statement")
+        stem = _sanitize_name(Path(name).stem)
+        destination = destination_dir / f"{stem}-{suffix}.pdf"
+        data = source.read()
+        if hasattr(source, "seek"):
+            source.seek(0)
+        if not data:
+            raise ValueError(f"PDF '{name}' is empty")
+        destination.write_bytes(data)
+
+    if not data.startswith(b"%PDF"):
+        destination.unlink(missing_ok=True)
+        raise ValueError(f"Invalid PDF content saved to {destination}")
+
+    return destination
+
+
+def process_pdf_statements(pdf_files: Iterable[PDFSource], rider_id: str):
     """Process multiple PDF statements and add to database."""
-    if not pdf_files:
+    pdf_list = list(pdf_files)
+    if not pdf_list:
         return None
     
     # Create combined DataFrame for all imported transactions
     combined_df = None
-    filenames = []
+    storage_dir = Path(config.pdf_local_cache_dir)
     
     # Process each PDF file
-    for index, pdf_file in enumerate(pdf_files):
+    for index, pdf_file in enumerate(pdf_list):
         # Generate unique filename
-        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M')
-        filename = f"{timestamp}_{index+1}.pdf"
-        
-        # Upload PDF to CCRMA server (will error on failure)
-        upload_pdf_to_ccrma(pdf_file, filename)
-        
-        filenames.append(filename)
-        
-        # Get filepath on CCRMA server
-        filepath = st.secrets['connections']['ccrma']['filepath_web'] + filename
+        timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        suffix = f"{timestamp}-{index+1}"
+        pdf_path = _persist_pdf(pdf_file, storage_dir, suffix)
         
         # Extract and process data
-        df_import = extract_trips_from_pdf(filepath)
+        try:
+            df_import = extract_trips_from_pdf(str(pdf_path))
+        except Exception as exc:
+            print(f"Failed to extract data from {pdf_path}: {exc}", file=sys.stderr)
+            continue
         df_import = clean_up_extracted_data(df_import)
+        df_import['Transaction Date'] = (
+            pd.to_datetime(df_import['Transaction Date'], utc=True)
+            .dt.tz_convert(None)
+        )
         df_import = categorize_trips(df_import)
         
         # Validate categories
@@ -160,7 +180,6 @@ def process_pdf_statements(pdf_files, rider_id):
     
     # Add the imported data to the database
     data_store = get_data_store()
-    rider_df = data_store.load_data(rider_id)
     updated_df = data_store.add_transactions(rider_id, combined_df)
 
     return updated_df

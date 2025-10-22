@@ -96,6 +96,10 @@ class AppConfig(BaseModel):
     # PDF processing
     pdf_table_areas_first_page: List[str] = ["0,500,800,100"]
     pdf_table_areas_other_pages: List[str] = ["0,550,800,90"]
+    pdf_local_cache_dir: str = Field(
+        default="tmp/pdf-cache",
+        description="Local directory for storing downloaded or uploaded PDF statements"
+    )
     
     # Transit categories configuration
     transit_categories: TransitCategories = TransitCategories()

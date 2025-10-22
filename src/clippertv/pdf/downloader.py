@@ -5,13 +5,14 @@ Clipper PDF Downloader: download PDF transaction reports for one or more users v
 import argparse
 import os
 import sys
-import time
+from collections import defaultdict
 from datetime import datetime, date, timedelta
-import subprocess
 
 import requests
 from bs4 import BeautifulSoup
 import tomllib
+
+from clippertv.pdf.processor import process_pdf_statements
 
 HOST = "https://www.clippercard.com"
 USER_AGENT = "clipper-pdf-downloader/0.1"
@@ -63,10 +64,10 @@ def parse_args():
         help="Path to config file (TOML)",
     )
     parser.add_argument(
-        "--upload",
+        "--ingest",
         action="store_true",
-        dest="upload",
-        help="After downloading PDFs, upload them to ClipperTV via uploader script",
+        dest="ingest",
+        help="After downloading PDFs, process and load transactions into the data store",
     )
     return parser.parse_args()
 
@@ -174,11 +175,22 @@ def download_pdfs(session, output_dir, start_date, end_date, dry_run):
         if resp2.status_code != 200:
             raise RuntimeError(f"Bad status for card {card['serial']}: {resp2.status_code}")
         ctype = resp2.headers.get("Content-Type", "")
-        if not ctype.startswith("application/pdf"):
-            raise RuntimeError(
-                f"Bad content type for card {card['serial']}: {ctype}"
-            )
         content = resp2.content
+        if not content:
+            print(
+                f"No PDF returned for card {card['serial']} ({card['nickname']}); skipping."
+            )
+            continue
+        if not ctype.startswith("application/pdf"):
+            if content.startswith(b"%PDF"):
+                print(
+                    f"Warning: Unexpected content type '{ctype}' for card {card['serial']}; "
+                    "continuing because response appears to be a PDF."
+                )
+            else:
+                raise RuntimeError(
+                    f"Bad content type for card {card['serial']}: {ctype}"
+                )
         if not content or not content.lstrip().startswith(b"%PDF"):
             raise RuntimeError(
                 f"Invalid PDF content for card {card['serial']}: missing PDF header"
@@ -191,9 +203,60 @@ def download_pdfs(session, output_dir, start_date, end_date, dry_run):
         with open(filename, "wb") as f:
             f.write(content)
         print(f"Saved PDF: {filename} (Card: {card['nickname']})")
-        saved_files.append(filename)
+        saved_files.append({"path": filename, "card": card})
 
     return saved_files
+
+
+def group_pdfs_by_rider(saved_files, rider_accounts):
+    """Group downloaded PDFs by rider identifier based on account mapping."""
+    files_by_rider = defaultdict(list)
+    unmatched = []
+
+    for item in saved_files:
+        card_serial = str(item["card"]["serial"])
+        rider = None
+        for rider_id, accounts in rider_accounts.items():
+            if card_serial in {str(acc) for acc in accounts}:
+                rider = rider_id
+                break
+        if rider:
+            files_by_rider[rider].append(item["path"])
+        else:
+            unmatched.append(card_serial)
+
+    return files_by_rider, unmatched
+
+
+def process_downloaded_pdfs(saved_files, rider_accounts):
+    """Process downloaded PDFs and load transactions into the data store."""
+    if not saved_files:
+        return
+
+    if not rider_accounts:
+        raise RuntimeError(
+            "Cannot process PDFs without rider account mapping in config (rider_accounts section)."
+        )
+
+    files_by_rider, unmatched = group_pdfs_by_rider(saved_files, rider_accounts)
+
+    if unmatched:
+        print(
+            f"Warning: No rider mapping found for card(s): {', '.join(unmatched)} "
+            "- skipping these PDFs."
+        )
+
+    if not files_by_rider:
+        print("No PDFs matched configured rider accounts; nothing to process.")
+        return
+
+    for rider_id, pdf_paths in files_by_rider.items():
+        print(f"Processing {len(pdf_paths)} PDF(s) for rider {rider_id}...")
+        result = process_pdf_statements(pdf_paths, rider_id)
+        if result is None or result.empty:
+            print(f" - No transactions extracted for rider {rider_id}.")
+        else:
+            print(f" - Processed {len(result)} transactions for rider {rider_id}.")
 
 
 def main():
@@ -212,13 +275,14 @@ def main():
         args.all = True
 
     users = []
+    config_data = {}
     if args.user or args.all:
         try:
-            config = load_config(args.config_file)
+            config_data = load_config(args.config_file)
         except Exception as e:
             sys.stderr.write(f"Error loading config file {args.config_file}: {e}\n")
             return 2
-        cfg_users = config.get('users', {})
+        cfg_users = config_data.get('users', {})
         if args.user:
             if args.user not in cfg_users:
                 sys.stderr.write(f"User '{args.user}' not found in config file\n")
@@ -254,6 +318,8 @@ def main():
     else:
         print("Downloading PDF transaction reports...")
 
+    all_saved_files = []
+
     for idx, (uname, email, pw) in enumerate(users):
         if len(users) > 1:
             print(f"\n=== Processing user: {uname} ({email}) ===")
@@ -262,15 +328,25 @@ def main():
         try:
             login(session, email, pw)
             saved_files = download_pdfs(session, args.output, start_date, end_date, args.dry_run)
-            if args.upload and saved_files:
-                uploader_script = os.path.join(os.path.dirname(__file__), "uploader.py")
-                for pdf_file in saved_files:
-                    print(f"Uploading PDF via uploader: {pdf_file}")
-                    result = subprocess.run([sys.executable, uploader_script, pdf_file], check=False)
-                    if result.returncode:
-                        raise RuntimeError(f"Uploader failed for {pdf_file} (exit {result.returncode})")
+            all_saved_files.extend(saved_files)
         except Exception as e:
             sys.stderr.write(f"Error for user {uname}: {e}\n")
+            return 1
+
+    if args.ingest and not args.dry_run:
+        if not config_data:
+            try:
+                config_data = load_config(args.config_file)
+            except Exception as e:
+                sys.stderr.write(
+                    f"Error loading config file {args.config_file} for processing: {e}\n"
+                )
+                return 1
+        rider_accounts = config_data.get("rider_accounts", {})
+        try:
+            process_downloaded_pdfs(all_saved_files, rider_accounts)
+        except Exception as e:
+            sys.stderr.write(f"Post-processing failed: {e}\n")
             return 1
 
     if args.dry_run:

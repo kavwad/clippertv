@@ -98,7 +98,7 @@ class TursoStore:
         # Process data into expected format
         trip_data = []
         for row in rows:
-            transaction_date = pd.to_datetime(row[0])
+            transaction_date = pd.to_datetime(row[0], utc=True).tz_convert(None)
             transaction_type = row[1]
             transit_mode = row[2]
             location = row[3]
@@ -271,7 +271,21 @@ class TursoStore:
 
     def add_transactions(self, rider_id: str, new_transactions_df: pd.DataFrame) -> pd.DataFrame:
         """Add new transactions to a rider's data and save."""
-        current_df = self.load_data(rider_id)
+        current_df = self.load_data(rider_id).copy()
+        if not current_df.empty:
+            current_df['Transaction Date'] = (
+                pd.to_datetime(current_df['Transaction Date'], utc=True)
+                .dt.tz_convert(None)
+            )
+
+        new_transactions_df = new_transactions_df.copy()
+        if new_transactions_df.empty:
+            return current_df
+
+        new_transactions_df['Transaction Date'] = (
+            pd.to_datetime(new_transactions_df['Transaction Date'], utc=True)
+            .dt.tz_convert(None)
+        )
 
         # Combine existing and new data
         combined_df = pd.concat([current_df, new_transactions_df])
