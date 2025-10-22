@@ -69,7 +69,7 @@ class TursoStore:
             SELECT
                 t.transaction_date,
                 t.transaction_type,
-                tm.name as category,
+                tm.name as transit_mode,
                 t.location,
                 t.route,
                 t.debit,
@@ -98,16 +98,30 @@ class TursoStore:
         # Process data into expected format
         trip_data = []
         for row in rows:
+            transaction_date = pd.to_datetime(row[0])
+            transaction_type = row[1]
+            transit_mode = row[2]
+            location = row[3]
+            route = row[4]
+            debit = row[5]
+            credit = row[6]
+            balance = row[7]
+            product = row[8]
+
+            # Reconstruct Category from transit mode and transaction type
+            # to match the format expected by the app
+            category = self._reconstruct_category(transit_mode, transaction_type)
+
             trip_data.append({
-                'Transaction Date': pd.to_datetime(row[0]),
-                'Transaction Type': row[1],
-                'Category': row[2] if row[2] else 'Unknown',
-                'Location': row[3],
-                'Route': row[4],
-                'Debit': row[5],
-                'Credit': row[6],
-                'Balance': row[7],
-                'Product': row[8]
+                'Transaction Date': transaction_date,
+                'Transaction Type': transaction_type,
+                'Category': category,
+                'Location': location,
+                'Route': route,
+                'Debit': debit,
+                'Credit': credit,
+                'Balance': balance,
+                'Product': product
             })
 
         df = pd.DataFrame(trip_data)
@@ -115,6 +129,30 @@ class TursoStore:
         # Cache the result
         self._cache[rider_id] = df
         return df
+
+    def _reconstruct_category(self, transit_mode: Optional[str], transaction_type: str) -> str:
+        """Reconstruct the category name from transit mode and transaction type.
+
+        This converts normalized database values back to the format expected by the app:
+        - BART + entry -> "BART Entrance"
+        - BART + exit -> "BART Exit"
+        - Muni Bus + entry -> "Muni Bus"
+        - etc.
+        """
+        if not transit_mode:
+            return 'Unknown'
+
+        # Transit modes that need Entrance/Exit suffixes
+        dual_tag_modes = {'BART', 'Caltrain', 'Ferry'}
+
+        if transit_mode in dual_tag_modes:
+            if transaction_type == 'entry':
+                return f"{transit_mode} Entrance"
+            elif transaction_type == 'exit':
+                return f"{transit_mode} Exit"
+
+        # All other modes don't use entrance/exit in their category name
+        return transit_mode
 
     def save_data(self, rider_id: str, df: pd.DataFrame) -> None:
         """Save a rider's data to Turso."""
@@ -130,15 +168,15 @@ class TursoStore:
             if pd.isna(row['Transaction Date']):
                 continue
 
-            # Get the transit ID
-            transit_id = None
-            if not pd.isna(row.get('Category')):
-                transit_name = row['Category']
-                transit_id = self._get_transit_id(transit_name)
+            # Parse category to get transit mode and transaction type
+            category = row.get('Category')
+            transit_id, normalized_transaction_type = self._parse_category(category)
 
             # Convert datetime to ISO string
             transaction_date = row['Transaction Date'].isoformat()
-            transaction_type = row.get('Transaction Type', '')
+
+            # Use the normalized transaction type if we parsed it, otherwise use the original
+            transaction_type = normalized_transaction_type or row.get('Transaction Type', 'manual')
 
             # Create trip data
             location = None if pd.isna(row.get('Location')) else row.get('Location')
@@ -175,6 +213,35 @@ class TursoStore:
 
         # Update cache
         self._cache[rider_id] = df
+
+    def _parse_category(self, category: Optional[str]) -> Tuple[Optional[int], Optional[str]]:
+        """Parse a category string to extract transit mode ID and transaction type.
+
+        Converts app format back to normalized database format:
+        - "BART Entrance" -> (BART_id, "entry")
+        - "BART Exit" -> (BART_id, "exit")
+        - "Muni Bus" -> (Muni_Bus_id, "entry")
+        - etc.
+
+        Returns:
+            Tuple of (transit_id, transaction_type)
+        """
+        if not category or pd.isna(category):
+            return (None, None)
+
+        # Check for entrance/exit suffixes
+        if category.endswith(' Entrance'):
+            transit_name = category[:-9]  # Remove ' Entrance'
+            transit_id = self._get_transit_id(transit_name)
+            return (transit_id, 'entry')
+        elif category.endswith(' Exit'):
+            transit_name = category[:-5]  # Remove ' Exit'
+            transit_id = self._get_transit_id(transit_name)
+            return (transit_id, 'exit')
+        else:
+            # No suffix, it's a regular single-tag transit mode
+            transit_id = self._get_transit_id(category)
+            return (transit_id, 'entry')
 
     def _get_existing_trips(self, rider_id: str) -> Dict[Tuple[str, str], int]:
         """Get existing trips with their IDs for a rider."""
