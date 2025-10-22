@@ -87,5 +87,5 @@ class DataStore:
             self._cache.clear()
 
 
-# Create a global instance
-data_store = DataStore()
+# Global instance removed - create via factory.get_data_store() instead
+# data_store = DataStore()

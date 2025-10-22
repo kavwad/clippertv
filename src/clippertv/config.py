@@ -51,29 +51,29 @@ class TransitCategories(BaseModel):
 
 class StorageConfig(BaseModel):
     """Configuration for data storage."""
-    
+
     # Storage type
-    storage_type: Literal["gcs", "supabase"] = Field(
-        default="gcs",
+    storage_type: Literal["gcs", "turso"] = Field(
+        default="turso",
         description="Storage backend to use"
     )
-    
+
     # Google Cloud Storage
     gcs_bucket: str = "clippertv_data"
     gcs_file_template: str = "data_{}.csv"  # Format with rider name
-    
+
     @property
-    def use_supabase(self) -> bool:
-        """Check if Supabase storage should be used."""
+    def use_turso(self) -> bool:
+        """Check if Turso storage should be used."""
         # Check environment variable first
         env_storage = os.environ.get("CLIPPERTV_STORAGE", "").lower()
-        if env_storage == "supabase":
+        if env_storage == "turso":
             return True
         if env_storage == "gcs":
             return False
-        
+
         # Fall back to configured value
-        return self.storage_type == "supabase"
+        return self.storage_type == "turso"
 
 class AppConfig(BaseModel):
     """Main application configuration."""

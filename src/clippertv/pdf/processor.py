@@ -10,7 +10,7 @@ import paramiko
 import streamlit as st
 
 from clippertv.config import config
-from clippertv.data.store import data_store
+from clippertv.data.factory import get_data_store
 from clippertv.pdf.extractor import extract_trips_from_pdf, clean_up_extracted_data
 
 
@@ -164,7 +164,8 @@ def process_pdf_statements(pdf_files, rider_id):
         return None
     
     # Add the imported data to the database
+    data_store = get_data_store()
     rider_df = data_store.load_data(rider_id)
     updated_df = data_store.add_transactions(rider_id, combined_df)
-    
+
     return updated_df

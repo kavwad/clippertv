@@ -11,10 +11,10 @@ dependencies = [
     "paramiko>=3.5.1",
     "plotly>=6.0.0",
     "pydantic>=2.6.0",
-    "streamlit>=1.42.2", # Use supabase-py instead of supabase
+    "streamlit>=1.42.2",
     "python-dotenv>=1.0.1",
     "tqdm>=4.66.0",
-    "supabase>=2.13.0",
+    "libsql>=0.1.11",
 ]
 
 [project.scripts]

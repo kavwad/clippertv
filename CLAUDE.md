@@ -8,11 +8,11 @@
 - Format code: `black src/ tests/`
 - Type check: `mypy src/`
 
-### Supabase Commands
-- Check Supabase setup: `python -m clippertv.data.supabase_info`
-- Show Supabase setup instructions: `python -m clippertv.data.migrate_to_supabase --setup-only`
-- Migrate data to Supabase: `python -m clippertv.data.migrate_to_supabase`
-- Toggle storage backend: `CLIPPERTV_STORAGE=supabase python run_app.py`
+### Turso Commands
+- Migrate from Supabase backup: `python -m clippertv.data.migrate_to_turso [backup_file]`
+- Dry run migration: `python -m clippertv.data.migrate_to_turso --dry-run`
+- Toggle storage backend: `CLIPPERTV_STORAGE=turso python run_app.py`
+- Required env vars: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
 
 ## Code Style
 - **Imports**: Group imports in order: standard library, third-party, local
@@ -29,21 +29,24 @@
 - Data layer (models, storage) in `data/` module
   - `models.py`: Pydantic data models
   - `schema.py`: Database schema definitions
-  - `store.py`: Google Cloud Storage implementation
-  - `supabase_store.py`: Supabase implementation
+  - `store.py`: Google Cloud Storage implementation (legacy)
+  - `turso_store.py`: Turso implementation (current)
+  - `turso_client.py`: Turso connection management
   - `factory.py`: Data store factory (selects appropriate implementation)
-  - `migrate_to_supabase.py`: Migration tool
+  - `migrate_to_turso.py`: Migration tool
 - PDF processing in `pdf/` module
 - Visualization components in `viz/` module
 - Main app in `app.py`
 
 ## Data Storage
-- **Google Cloud Storage**: Original implementation
+- **Google Cloud Storage**: Legacy CSV-based implementation
   - CSV files stored in GCS bucket
   - Each rider has dedicated CSV file
   - Configured via Streamlit secrets
-- **Supabase**: New implementation
-  - PostgreSQL database with REST API
+- **Turso**: LibSQL/SQLite-based implementation (CURRENT)
+  - Edge database built on SQLite
   - Relational model: Riders, Transit Modes, Trips
-  - Configured via environment variables or Streamlit secrets
-  - Migration script for transferring data from GCS
+  - No auto-pause on free tier
+  - 5GB storage, 500M row reads/month free
+  - Configured via `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`
+  - Direct remote connection for simplicity

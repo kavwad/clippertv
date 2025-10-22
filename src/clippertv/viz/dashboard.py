@@ -4,7 +4,6 @@ import pandas as pd
 import streamlit as st
 
 from ..config import config
-from ..data.store import data_store
 from .charts import (
     create_trip_chart,
     create_cost_chart,
@@ -81,7 +80,7 @@ def create_pivot_year_cost(df):
             aggfunc='sum',
             fill_value=0
         )[['Caltrain Adult 3 Zone Monthly Pass']]
-        
+
         caltrain_pass_yearly.columns = pd.MultiIndex.from_tuples([('Debit', 'Caltrain Pass')])
 
         # Add Caltrain pass cost to pivot table
@@ -91,21 +90,21 @@ def create_pivot_year_cost(df):
 
         # Calculate net values for Caltrain
         pivot_year_cost[('Debit', 'Caltrain')] = (
-            pivot_year_cost[('Debit', 'Caltrain Entrance')] +
-            pivot_year_cost[('Debit', 'Caltrain Pass')] -
-            pivot_year_cost[('Credit', 'Caltrain Exit')]
+            pivot_year_cost.get(('Debit', 'Caltrain Entrance'), 0) +
+            pivot_year_cost.get(('Debit', 'Caltrain Pass'), 0) -
+            pivot_year_cost.get(('Credit', 'Caltrain Exit'), 0)
         )
     else:
         pivot_year_cost[('Debit', 'Caltrain')] = (
-            pivot_year_cost[('Debit', 'Caltrain Entrance')] -
-            pivot_year_cost[('Credit', 'Caltrain Exit')]
+            pivot_year_cost.get(('Debit', 'Caltrain Entrance'), 0) -
+            pivot_year_cost.get(('Credit', 'Caltrain Exit'), 0)
         )
 
     # Calculate net values for Ferry
     pivot_year_cost[('Debit', 'Ferry')] = (
-        pivot_year_cost[('Debit', 'Ferry Entrance')] +
-        pivot_year_cost[('Debit', 'Ferry Exit')] -
-        pivot_year_cost[('Credit', 'Ferry Exit')]
+        pivot_year_cost.get(('Debit', 'Ferry Entrance'), 0) +
+        pivot_year_cost.get(('Debit', 'Ferry Exit'), 0) -
+        pivot_year_cost.get(('Credit', 'Ferry Exit'), 0)
     )
 
     # Drop credit columns
@@ -150,21 +149,21 @@ def create_pivot_month_cost(df):
 
         # Calculate net values for Caltrain
         pivot_month_cost[('Debit', 'Caltrain')] = (
-            pivot_month_cost[('Debit', 'Caltrain Entrance')] +
-            pivot_month_cost[('Debit', 'Caltrain Pass')] -
-            pivot_month_cost[('Credit', 'Caltrain Exit')]
+            pivot_month_cost.get(('Debit', 'Caltrain Entrance'), 0) +
+            pivot_month_cost.get(('Debit', 'Caltrain Pass'), 0) -
+            pivot_month_cost.get(('Credit', 'Caltrain Exit'), 0)
         )
     else:
         pivot_month_cost[('Debit', 'Caltrain')] = (
-            pivot_month_cost[('Debit', 'Caltrain Entrance')] -
-            pivot_month_cost[('Credit', 'Caltrain Exit')]
+            pivot_month_cost.get(('Debit', 'Caltrain Entrance'), 0) -
+            pivot_month_cost.get(('Credit', 'Caltrain Exit'), 0)
         )
 
     # Calculate net values for Ferry
     pivot_month_cost[('Debit', 'Ferry')] = (
-        pivot_month_cost[('Debit', 'Ferry Entrance')] +
-        pivot_month_cost[('Debit', 'Ferry Exit')] -
-        pivot_month_cost[('Credit', 'Ferry Exit')]
+        pivot_month_cost.get(('Debit', 'Ferry Entrance'), 0) +
+        pivot_month_cost.get(('Debit', 'Ferry Exit'), 0) -
+        pivot_month_cost.get(('Credit', 'Ferry Exit'), 0)
     )
 
     # Drop credit columns

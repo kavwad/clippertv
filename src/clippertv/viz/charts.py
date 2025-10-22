@@ -68,10 +68,13 @@ def create_bike_walk_chart():
     return None
 
 
-def create_comparison_chart(riders):
-    """Create chart comparing total trips between riders."""
-    from ..data.store import data_store
-    
+def create_comparison_chart(riders, data_store):
+    """Create chart comparing total trips between riders.
+
+    Args:
+        riders: List of rider IDs to compare
+        data_store: Data store instance to load rider data from
+    """
     comparison_chart = go.Figure()
     
     start_date = None

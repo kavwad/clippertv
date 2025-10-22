@@ -219,7 +219,7 @@ def main():
     st.session_state["data_store"] = data_store
     
     # Show storage backend indicator (can be removed in production)
-    storage_type = "Supabase" if config.storage.use_supabase else "Google Cloud Storage"
+    storage_type = "Turso" if config.storage.use_turso else "Google Cloud Storage"
     st.sidebar.info(f"Using {storage_type} backend")
     
     # Select rider
@@ -233,7 +233,7 @@ def main():
     trip_chart = create_trip_chart(pivot_month)
     cost_chart = create_cost_chart(pivot_month_cost)
     bike_walk_chart = create_bike_walk_chart()
-    comparison_chart = create_comparison_chart(config.riders)
+    comparison_chart = create_comparison_chart(config.riders, data_store)
     
     # Calculate summary statistics
     stats = calculate_summary_stats(pivot_month, pivot_month_cost, data_store.load_data(rider))
