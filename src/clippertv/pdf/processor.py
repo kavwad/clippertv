@@ -103,19 +103,16 @@ def upload_pdf_to_ccrma(pdf_file, filename):
             username=st.secrets['connections']['ccrma']['username'],
             password=st.secrets['connections']['ccrma']['password']
         )
-        
+
         # Open SFTP connection and upload file
         sftp = ssh.open_sftp()
         sftp.putfo(
             BytesIO(pdf_file.read()),
             st.secrets['connections']['ccrma']['filepath'] + filename
         )
-        
         sftp.close()
-        return True
     except Exception as e:
-        # Log the error (future enhancement)
-        return False
+        raise RuntimeError(f"Failed to upload PDF '{filename}' to CCRMA: {e}")
     finally:
         ssh.close()
 
@@ -135,10 +132,8 @@ def process_pdf_statements(pdf_files, rider_id):
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M')
         filename = f"{timestamp}_{index+1}.pdf"
         
-        # Upload PDF to CCRMA server
-        upload_success = upload_pdf_to_ccrma(pdf_file, filename)
-        if not upload_success:
-            continue
+        # Upload PDF to CCRMA server (will error on failure)
+        upload_pdf_to_ccrma(pdf_file, filename)
         
         filenames.append(filename)
         
