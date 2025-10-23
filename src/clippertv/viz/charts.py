@@ -76,13 +76,14 @@ def create_comparison_chart(riders, data_store):
         data_store: Data store instance to load rider data from
     """
     comparison_chart = go.Figure()
-    
+
+    rider_data = data_store.load_multiple_riders(riders)
+
     start_date = None
     latest_date = None
-    
+
     # Find the overall date range across all riders
-    for rider in riders:
-        df = data_store.load_data(rider)
+    for rider, df in rider_data.items():
         rider_first_date = df['Transaction Date'].min()
         rider_last_date = df['Transaction Date'].max()
         
@@ -103,8 +104,8 @@ def create_comparison_chart(riders, data_store):
                    'B': config.transit_categories.color_map['AC Transit']}
                    
     for rider in riders:
-        df = data_store.load_data(rider)
-        
+        df = rider_data[rider]
+
         # Create monthly pivot table
         pivot_month = (df.groupby([pd.Grouper(key='Transaction Date', freq='ME'), 'Category'])
                       .size()

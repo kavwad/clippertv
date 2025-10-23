@@ -1,7 +1,7 @@
 """Data access layer for ClipperTV."""
 
 import json
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 import pandas as pd
 import streamlit as st
 
@@ -39,6 +39,10 @@ class DataStore:
         # Cache the result
         self._cache[rider_id] = df
         return df
+
+    def load_multiple_riders(self, rider_ids: List[str]) -> Dict[str, pd.DataFrame]:
+        """Load multiple riders' data (helper for parity with Turso store)."""
+        return {rider_id: self.load_data(rider_id) for rider_id in rider_ids}
     
     def save_data(self, rider_id: str, df: pd.DataFrame) -> None:
         """Save a rider's data to Google Cloud Storage."""

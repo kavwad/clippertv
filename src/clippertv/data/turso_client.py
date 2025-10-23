@@ -1,7 +1,8 @@
 """Turso database client initialization and management."""
 
 import os
-from typing import Optional
+from threading import Lock
+from typing import Any, Optional
 
 try:
     import libsql
@@ -9,16 +10,13 @@ except ImportError:
     libsql = None
 
 
-def get_turso_client():
-    """Get or create Turso database client.
+_conn_lock = Lock()
+_cached_conn: Optional[Any] = None
+_db_initialized = False
 
-    Returns:
-        libsql.Connection: Initialized Turso connection
 
-    Raises:
-        ImportError: If libsql is not installed
-        ValueError: If required environment variables are not set
-    """
+def _create_turso_client():
+    """Create a new Turso client connection."""
     if libsql is None:
         raise ImportError(
             "libsql is not installed. "
@@ -51,11 +49,32 @@ def get_turso_client():
         )
 
     # Connect directly to remote (simpler, no cache issues)
-    conn = libsql.connect(db_url, auth_token=auth_token)
-    return conn
+    return libsql.connect(db_url, auth_token=auth_token)
 
 
-def initialize_database() -> None:
+def get_turso_client():
+    """Get or create Turso database client.
+
+    Returns:
+        libsql.Connection: Initialized Turso connection
+
+    Raises:
+        ImportError: If libsql is not installed
+        ValueError: If required environment variables are not set
+    """
+    global _cached_conn
+
+    if _cached_conn is not None:
+        return _cached_conn
+
+    with _conn_lock:
+        if _cached_conn is None:
+            _cached_conn = _create_turso_client()
+
+    return _cached_conn
+
+
+def initialize_database(force: bool = False) -> None:
     """Initialize Turso database with required tables.
 
     Creates tables if they don't exist:
@@ -63,78 +82,96 @@ def initialize_database() -> None:
     - transit_modes
     - trips
     """
+    global _db_initialized
+
+    if _db_initialized and not force:
+        return
+
     conn = get_turso_client()
 
-    # Create riders table
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS riders (
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            email TEXT,
-            created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT DEFAULT (datetime('now'))
-        )
-    """)
+    with _conn_lock:
+        if _db_initialized and not force:
+            return
 
-    # Create transit_modes table
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS transit_modes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE NOT NULL,
-            display_name TEXT NOT NULL,
-            color TEXT NOT NULL,
-            created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT DEFAULT (datetime('now'))
-        )
-    """)
-
-    # Create trips table
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS trips (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            rider_id TEXT NOT NULL,
-            transit_id INTEGER,
-            transaction_type TEXT NOT NULL,
-            transaction_date TEXT NOT NULL,
-            location TEXT,
-            route TEXT,
-            debit REAL,
-            credit REAL,
-            balance REAL,
-            product TEXT,
-            created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT DEFAULT (datetime('now')),
-            FOREIGN KEY (rider_id) REFERENCES riders(id),
-            FOREIGN KEY (transit_id) REFERENCES transit_modes(id)
-        )
-    """)
-
-    # Create indices
-    conn.execute("CREATE INDEX IF NOT EXISTS trips_rider_id_idx ON trips(rider_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS trips_transaction_date_idx ON trips(transaction_date)")
-
-    # Seed transit modes if empty
-    result = conn.execute("SELECT COUNT(*) as count FROM transit_modes")
-    count = result.fetchone()[0] if result else 0
-
-    if count == 0:
-        # Insert default transit modes
-        transit_modes = [
-            ("Muni Bus", "Muni Bus", "#BA0C2F"),
-            ("Muni Metro", "Muni Metro", "#FDB813"),
-            ("BART", "BART", "#0099CC"),
-            ("Cable Car", "Cable Car", "#8B4513"),
-            ("Caltrain", "Caltrain", "#6C6C6C"),
-            ("AC Transit", "AC Transit", "#00A55E"),
-            ("Ferry", "Ferry", "#4DD0E1"),
-            ("SamTrans", "SamTrans", "#D3D3D3"),
-        ]
-
-        for name, display_name, color in transit_modes:
-            conn.execute(
-                "INSERT INTO transit_modes (name, display_name, color) VALUES (?, ?, ?)",
-                [name, display_name, color]
+        # Create riders table
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS riders (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                email TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
             )
+            """
+        )
 
-    # Commit changes
-    conn.commit()
+        # Create transit_modes table
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS transit_modes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                display_name TEXT NOT NULL,
+                color TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+            )
+            """
+        )
+
+        # Create trips table
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS trips (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                rider_id TEXT NOT NULL,
+                transit_id INTEGER,
+                transaction_type TEXT NOT NULL,
+                transaction_date TEXT NOT NULL,
+                location TEXT,
+                route TEXT,
+                debit REAL,
+                credit REAL,
+                balance REAL,
+                product TEXT,
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (rider_id) REFERENCES riders(id),
+                FOREIGN KEY (transit_id) REFERENCES transit_modes(id)
+            )
+            """
+        )
+
+        # Create indices
+        conn.execute("CREATE INDEX IF NOT EXISTS trips_rider_id_idx ON trips(rider_id)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS trips_transaction_date_idx ON trips(transaction_date)"
+        )
+
+        # Seed transit modes if empty
+        result = conn.execute("SELECT COUNT(*) as count FROM transit_modes")
+        count = result.fetchone()[0] if result else 0
+
+        if count == 0:
+            # Insert default transit modes
+            transit_modes = [
+                ("Muni Bus", "Muni Bus", "#BA0C2F"),
+                ("Muni Metro", "Muni Metro", "#FDB813"),
+                ("BART", "BART", "#0099CC"),
+                ("Cable Car", "Cable Car", "#8B4513"),
+                ("Caltrain", "Caltrain", "#6C6C6C"),
+                ("AC Transit", "AC Transit", "#00A55E"),
+                ("Ferry", "Ferry", "#4DD0E1"),
+                ("SamTrans", "SamTrans", "#D3D3D3"),
+            ]
+
+            for name, display_name, color in transit_modes:
+                conn.execute(
+                    "INSERT INTO transit_modes (name, display_name, color) VALUES (?, ?, ?)",
+                    [name, display_name, color]
+                )
+
+        # Commit changes once all setup is done
+        conn.commit()
+        _db_initialized = True

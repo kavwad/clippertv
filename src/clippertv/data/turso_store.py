@@ -57,78 +57,80 @@ class TursoStore:
 
     def load_data(self, rider_id: str) -> pd.DataFrame:
         """Load a rider's data from Turso."""
-        # Check cache first
-        if rider_id in self._cache:
-            return self._cache[rider_id]
+        return self.load_multiple_riders([rider_id])[rider_id]
 
-        # Ensure rider exists
-        self._ensure_rider_exists(rider_id)
+    def load_multiple_riders(self, rider_ids: List[str]) -> Dict[str, pd.DataFrame]:
+        """Load data for multiple riders with a single query where possible."""
+        # Separate which rider data we already have cached
+        missing = [r for r in rider_ids if r not in self._cache]
 
-        # Query trips for the rider with transit mode names
-        result = self.conn.execute("""
-            SELECT
-                t.transaction_date,
-                t.transaction_type,
-                tm.name as transit_mode,
-                t.location,
-                t.route,
-                t.debit,
-                t.credit,
-                t.balance,
-                t.product
-            FROM trips t
-            LEFT JOIN transit_modes tm ON t.transit_id = tm.id
-            WHERE t.rider_id = ?
-            ORDER BY t.transaction_date DESC
-        """, [rider_id])
+        if missing:
+            for rider_id in missing:
+                self._ensure_rider_exists(rider_id)
 
-        rows = result.fetchall()
+            placeholders = ",".join("?" for _ in missing)
+            query = f"""
+                SELECT
+                    t.rider_id,
+                    t.transaction_date,
+                    t.transaction_type,
+                    tm.name as transit_mode,
+                    t.location,
+                    t.route,
+                    t.debit,
+                    t.credit,
+                    t.balance,
+                    t.product
+                FROM trips t
+                LEFT JOIN transit_modes tm ON t.transit_id = tm.id
+                WHERE t.rider_id IN ({placeholders})
+                ORDER BY t.rider_id, t.transaction_date DESC
+            """
 
-        # Convert to DataFrame
-        if not rows:
-            # Return empty DataFrame with correct columns
-            df = pd.DataFrame(columns=[
-                'Transaction Date', 'Transaction Type', 'Category',
-                'Location', 'Route', 'Debit', 'Credit', 'Balance', 'Product'
-            ])
-            df['Transaction Date'] = pd.to_datetime(df['Transaction Date'])
-            self._cache[rider_id] = df
-            return df
+            result = self.conn.execute(query, missing)
+            rows = result.fetchall()
 
-        # Process data into expected format
-        trip_data = []
-        for row in rows:
-            transaction_date = pd.to_datetime(row[0], utc=True).tz_convert(None)
-            transaction_type = row[1]
-            transit_mode = row[2]
-            location = row[3]
-            route = row[4]
-            debit = row[5]
-            credit = row[6]
-            balance = row[7]
-            product = row[8]
+            grouped: Dict[str, List[Dict[str, Any]]] = {r: [] for r in missing}
+            for row in rows:
+                rider_id = row[0]
+                transaction_date = pd.to_datetime(row[1], utc=True).tz_convert(None)
+                transaction_type = row[2]
+                transit_mode = row[3]
+                location = row[4]
+                route = row[5]
+                debit = row[6]
+                credit = row[7]
+                balance = row[8]
+                product = row[9]
 
-            # Reconstruct Category from transit mode and transaction type
-            # to match the format expected by the app
-            category = self._reconstruct_category(transit_mode, transaction_type)
+                category = self._reconstruct_category(transit_mode, transaction_type)
 
-            trip_data.append({
-                'Transaction Date': transaction_date,
-                'Transaction Type': transaction_type,
-                'Category': category,
-                'Location': location,
-                'Route': route,
-                'Debit': debit,
-                'Credit': credit,
-                'Balance': balance,
-                'Product': product
-            })
+                grouped[rider_id].append({
+                    'Transaction Date': transaction_date,
+                    'Transaction Type': transaction_type,
+                    'Category': category,
+                    'Location': location,
+                    'Route': route,
+                    'Debit': debit,
+                    'Credit': credit,
+                    'Balance': balance,
+                    'Product': product
+                })
 
-        df = pd.DataFrame(trip_data)
+            for rider_id in missing:
+                rider_rows = grouped.get(rider_id, [])
+                if rider_rows:
+                    df = pd.DataFrame(rider_rows)
+                else:
+                    df = pd.DataFrame(columns=[
+                        'Transaction Date', 'Transaction Type', 'Category',
+                        'Location', 'Route', 'Debit', 'Credit', 'Balance', 'Product'
+                    ])
+                    df['Transaction Date'] = pd.to_datetime(df['Transaction Date'])
 
-        # Cache the result
-        self._cache[rider_id] = df
-        return df
+                self._cache[rider_id] = df
+
+        return {rider_id: self._cache[rider_id] for rider_id in rider_ids}
 
     def _reconstruct_category(self, transit_mode: Optional[str], transaction_type: str) -> str:
         """Reconstruct the category name from transit mode and transaction type.
@@ -318,7 +320,3 @@ class TursoStore:
                 del self._cache[rider_id]
         else:
             self._cache.clear()
-
-
-# Create a global instance
-turso_store = TursoStore()
