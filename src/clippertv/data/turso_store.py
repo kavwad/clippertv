@@ -156,14 +156,23 @@ class TursoStore:
 
     def save_data(self, rider_id: str, df: pd.DataFrame) -> None:
         """Save a rider's data to Turso."""
+        import sys
         # Ensure rider exists
+        print(f"    Ensuring rider {rider_id} exists...", file=sys.stderr)
         self._ensure_rider_exists(rider_id)
 
         # Get existing trip data to determine what to insert/update
+        print(f"    Fetching existing trips...", file=sys.stderr)
         existing_trips = self._get_existing_trips(rider_id)
+        print(f"    Found {len(existing_trips)} existing trips in database", file=sys.stderr)
 
         # Process the dataframe into trips
+        print(f"    Processing {len(df)} rows...", file=sys.stderr)
+        processed_count = 0
         for _, row in df.iterrows():
+            processed_count += 1
+            if processed_count % 50 == 0:
+                print(f"      Processed {processed_count}/{len(df)} rows...", file=sys.stderr)
             # Skip if transaction date is missing
             if pd.isna(row['Transaction Date']):
                 continue
@@ -186,8 +195,9 @@ class TursoStore:
             balance = None if pd.isna(row.get('Balance')) else float(row.get('Balance'))
             product = None if pd.isna(row.get('Product')) else row.get('Product')
 
-            # Check if trip already exists
-            key = (transaction_date, transaction_type)
+            # Check if trip already exists using a more robust composite key
+            # Include location, debit, and credit to handle multiple trips at the same time
+            key = (transaction_date, transaction_type, location, debit, credit)
             if key in existing_trips:
                 # Update existing trip
                 trip_id = existing_trips[key]
@@ -209,7 +219,9 @@ class TursoStore:
                       location, route, debit, credit, balance, product])
 
         # Commit changes
+        print(f"    Committing changes to database...", file=sys.stderr)
         self.conn.commit()
+        print(f"    Committed successfully!", file=sys.stderr)
 
         # Update cache
         self._cache[rider_id] = df
@@ -243,19 +255,22 @@ class TursoStore:
             transit_id = self._get_transit_id(category)
             return (transit_id, 'entry')
 
-    def _get_existing_trips(self, rider_id: str) -> Dict[Tuple[str, str], int]:
-        """Get existing trips with their IDs for a rider."""
+    def _get_existing_trips(self, rider_id: str) -> Dict[Tuple[str, str, str, float, float], int]:
+        """Get existing trips with their IDs for a rider.
+
+        Returns a dict mapping (transaction_date, transaction_type, location, debit, credit) -> id
+        """
         result = self.conn.execute("""
-            SELECT id, transaction_date, transaction_type
+            SELECT id, transaction_date, transaction_type, location, debit, credit
             FROM trips
             WHERE rider_id = ?
         """, [rider_id])
 
         rows = result.fetchall()
 
-        # Map (transaction_date, transaction_type) -> id
+        # Map (transaction_date, transaction_type, location, debit, credit) -> id
         return {
-            (row[1], row[2]): row[0]
+            (row[1], row[2], row[3], row[4], row[5]): row[0]
             for row in rows
         }
 
@@ -271,33 +286,30 @@ class TursoStore:
 
     def add_transactions(self, rider_id: str, new_transactions_df: pd.DataFrame) -> pd.DataFrame:
         """Add new transactions to a rider's data and save."""
-        current_df = self.load_data(rider_id).copy()
-        if not current_df.empty:
-            current_df['Transaction Date'] = (
-                pd.to_datetime(current_df['Transaction Date'], utc=True)
-                .dt.tz_convert(None)
-            )
+        import sys
 
         new_transactions_df = new_transactions_df.copy()
         if new_transactions_df.empty:
-            return current_df
+            print(f"  No new transactions to add", file=sys.stderr)
+            return self.load_data(rider_id)
 
+        print(f"  Normalizing {len(new_transactions_df)} new transactions...", file=sys.stderr)
         new_transactions_df['Transaction Date'] = (
             pd.to_datetime(new_transactions_df['Transaction Date'], utc=True)
             .dt.tz_convert(None)
         )
 
-        # Combine existing and new data
-        combined_df = pd.concat([current_df, new_transactions_df])
+        # Save only the new transactions
+        print(f"  Saving new transactions to database...", file=sys.stderr)
+        self.save_data(rider_id, new_transactions_df)
 
-        # Sort by transaction date and reset index
-        combined_df = (combined_df
-                      .sort_values('Transaction Date', ascending=False)
-                      .reset_index(drop=True))
+        # Invalidate cache so next load will fetch fresh data
+        print(f"  Invalidating cache...", file=sys.stderr)
+        self.invalidate_cache(rider_id)
 
-        # Save the updated data
-        self.save_data(rider_id, combined_df)
-        return combined_df
+        # Return the combined dataset
+        print(f"  Loading updated data...", file=sys.stderr)
+        return self.load_data(rider_id)
 
     def invalidate_cache(self, rider_id: Optional[str] = None) -> None:
         """Clear the cache for a specific rider or all riders."""

@@ -18,6 +18,9 @@ from clippertv.pdf.extractor import extract_trips_from_pdf, clean_up_extracted_d
 
 def categorize_trips(df_import):
     """Categorize trips based on transaction type and location."""
+    # Initialize Category column
+    df_import['Category'] = None
+
     # AC Transit
     df_import.loc[df_import['Location'] == 'ACT bus', 'Category'] = 'AC Transit'
     
@@ -147,39 +150,56 @@ def process_pdf_statements(pdf_files: Iterable[PDFSource], rider_id: str):
     
     # Process each PDF file
     for index, pdf_file in enumerate(pdf_list):
+        print(f"[{index+1}/{len(pdf_list)}] Processing PDF...", file=sys.stderr)
+
         # Generate unique filename
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
         suffix = f"{timestamp}-{index+1}"
+        print(f"  Persisting PDF to cache...", file=sys.stderr)
         pdf_path = _persist_pdf(pdf_file, storage_dir, suffix)
-        
+
         # Extract and process data
         try:
+            print(f"  Extracting data from {pdf_path.name}...", file=sys.stderr)
             df_import = extract_trips_from_pdf(str(pdf_path))
+            print(f"  Extracted {len(df_import)} rows", file=sys.stderr)
         except Exception as exc:
-            print(f"Failed to extract data from {pdf_path}: {exc}", file=sys.stderr)
+            print(f"  Failed to extract data from {pdf_path}: {exc}", file=sys.stderr)
             continue
+
+        print(f"  Cleaning data...", file=sys.stderr)
         df_import = clean_up_extracted_data(df_import)
+
+        print(f"  Converting timestamps...", file=sys.stderr)
         df_import['Transaction Date'] = (
             pd.to_datetime(df_import['Transaction Date'], utc=True)
             .dt.tz_convert(None)
         )
+
+        print(f"  Categorizing trips...", file=sys.stderr)
         df_import = categorize_trips(df_import)
-        
+
         # Validate categories
+        print(f"  Validating categories...", file=sys.stderr)
         validate_categories(df_import)
-        
+
         # Add to combined DataFrame
+        print(f"  Combining with previous data...", file=sys.stderr)
         if combined_df is None:
             combined_df = df_import
         else:
-            combined_df = pd.concat([combined_df, df_import])
+            # Use outer join to handle any missing columns
+            combined_df = pd.concat([combined_df, df_import], ignore_index=True, join='outer')
     
     # If no data was successfully imported, return None
     if combined_df is None or combined_df.empty:
+        print("  No data was successfully imported", file=sys.stderr)
         return None
-    
+
     # Add the imported data to the database
+    print(f"\nSaving {len(combined_df)} transactions to database...", file=sys.stderr)
     data_store = get_data_store()
     updated_df = data_store.add_transactions(rider_id, combined_df)
+    print(f"Database updated successfully!", file=sys.stderr)
 
     return updated_df
