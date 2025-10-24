@@ -4,7 +4,7 @@ from functools import lru_cache
 from typing import Dict, Any
 
 from clippertv.config import config
-from clippertv.data.store import DataStore as GCSDataStore
+from clippertv.data.gcs_store import DataStore as GCSDataStore
 from clippertv.data.turso_store import TursoStore
 
 

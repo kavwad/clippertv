@@ -23,7 +23,7 @@ clippertv/
 │       │   ├── factory.py        # Data store factory
 │       │   ├── models.py         # Data models
 │       │   ├── schema.py         # Database schema
-│       │   ├── store.py          # Legacy GCS data storage
+│       │   ├── gcs_store.py      # Legacy GCS data storage
 │       │   ├── turso_client.py   # Turso connection helpers
 │       │   └── turso_store.py    # Turso data storage
 │       ├── pdf/
