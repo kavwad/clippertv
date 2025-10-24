@@ -31,8 +31,11 @@ def _create_turso_client():
     if not db_url or not auth_token:
         try:
             import streamlit as st
-            db_url = db_url or st.secrets.get("turso", {}).get("database_url")
-            auth_token = auth_token or st.secrets.get("turso", {}).get("auth_token")
+            connection_settings = (
+                st.secrets.get("connections", {}).get("turso", {})
+            )
+            db_url = db_url or connection_settings.get("database_url")
+            auth_token = auth_token or connection_settings.get("auth_token")
         except (ImportError, FileNotFoundError, AttributeError):
             pass
 

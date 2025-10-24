@@ -60,8 +60,20 @@ def display_add_trips_section(rider):
     st.divider()
     with st.expander('Add trips'):
         password = st.text_input('Enter password', type='password')
+        configured_password = (
+            st.secrets.get("streamlit", {})
+            .get("auth", {})
+            .get("password")
+        )
+        is_authorized = False
+
+        if configured_password is None:
+            st.info("No admin password configured; access allowed.", icon="ℹ️")
+            is_authorized = True
+        elif password == configured_password:
+            is_authorized = True
         
-        if password == st.secrets['password']:
+        if is_authorized:
             import_tab, manual_tab = st.tabs(['Import from pdf', 'Add manually'])
             
             with import_tab:
@@ -200,10 +212,15 @@ def initialize_data_store():
     """Initialize the data store based on configuration."""
     # Get GCS credentials from Streamlit secrets if available
     gcs_key = None
-    if "gcs_key" in st.secrets:
+    gcs_credentials = (
+        st.secrets.get("connections", {})
+        .get("gcs", {})
+        .get("credentials_json")
+    )
+    if gcs_credentials:
         try:
-            gcs_key = json.loads(st.secrets["gcs_key"])
-        except (json.JSONDecodeError, KeyError):
+            gcs_key = json.loads(gcs_credentials)
+        except (json.JSONDecodeError, TypeError):
             st.error("Error loading GCS credentials from secrets.")
     
     # Create and return the appropriate data store

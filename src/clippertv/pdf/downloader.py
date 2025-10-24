@@ -282,7 +282,8 @@ def main():
         except Exception as e:
             sys.stderr.write(f"Error loading config file {args.config_file}: {e}\n")
             return 2
-        cfg_users = config_data.get('users', {})
+        clipper_cfg = config_data.get("clipper", {})
+        cfg_users = clipper_cfg.get('users', {})
         if args.user:
             if args.user not in cfg_users:
                 sys.stderr.write(f"User '{args.user}' not found in config file\n")
@@ -342,7 +343,8 @@ def main():
                     f"Error loading config file {args.config_file} for processing: {e}\n"
                 )
                 return 1
-        rider_accounts = config_data.get("rider_accounts", {})
+        clipper_cfg = config_data.get("clipper", {})
+        rider_accounts = clipper_cfg.get("rider_accounts", {})
         try:
             process_downloaded_pdfs(all_saved_files, rider_accounts)
         except Exception as e:

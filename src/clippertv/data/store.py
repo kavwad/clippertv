@@ -14,7 +14,21 @@ class DataStore:
     
     def __init__(self, gcs_key: Optional[Dict[str, Any]] = None):
         """Initialize DataStore with Google Cloud Storage credentials."""
-        self.gcs_key = gcs_key or json.loads(st.secrets['gcs_key'])
+        if gcs_key is not None:
+            self.gcs_key = gcs_key
+        else:
+            raw_credentials = (
+                st.secrets.get("connections", {})
+                .get("gcs", {})
+                .get("credentials_json")
+            )
+            if not raw_credentials:
+                raise ValueError(
+                    "Google Cloud Storage credentials not configured. "
+                    "Add [connections.gcs].credentials_json to secrets.toml "
+                    "or pass gcs_key explicitly."
+                )
+            self.gcs_key = json.loads(raw_credentials)
         self.data_bucket = config.data_bucket
         self._cache: Dict[str, pd.DataFrame] = {}  # Cache for dataframes
     

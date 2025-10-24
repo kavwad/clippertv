@@ -114,7 +114,7 @@ def main():
     try:
         # Load secrets
         secrets = load_secrets()
-        rider_accounts = secrets.get("rider_accounts", {})
+        rider_accounts = secrets.get("clipper", {}).get("rider_accounts", {})
         
         if not rider_accounts:
             print("Error: No rider accounts configured in secrets.toml")

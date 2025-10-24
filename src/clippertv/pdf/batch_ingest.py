@@ -27,7 +27,7 @@ def load_card_mapping(secrets_path: Path = Path(".streamlit/secrets.toml")) -> D
     """Return a mapping of card serial numbers to rider IDs."""
     secrets = tomllib.loads(secrets_path.read_text())
     mapping: Dict[str, str] = {}
-    rider_accounts = secrets.get("rider_accounts", {})
+    rider_accounts = secrets.get("clipper", {}).get("rider_accounts", {})
     for rider, cards in rider_accounts.items():
         for card in cards:
             mapping[str(card)] = rider.upper()
