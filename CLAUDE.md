@@ -9,8 +9,6 @@
 - Type check: `uv run mypy src/`
 
 ### Turso Commands
-- Migrate from Supabase backup: `uv run python -m clippertv.data.migrate_to_turso [backup_file]`
-- Dry run migration: `uv run python -m clippertv.data.migrate_to_turso --dry-run`
 - Toggle storage backend: `CLIPPERTV_STORAGE=turso uv run python run_app.py`
 - Required env vars: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
 
@@ -33,7 +31,6 @@
   - `turso_store.py`: Turso implementation (current)
   - `turso_client.py`: Turso connection management
   - `factory.py`: Data store factory (selects appropriate implementation)
-  - `migrate_to_turso.py`: Migration tool
 - PDF processing in `pdf/` module
 - Visualization components in `viz/` module
 - Main app in `app.py`
