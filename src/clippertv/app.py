@@ -235,10 +235,6 @@ def main():
     data_store = initialize_data_store()
     st.session_state["data_store"] = data_store
     
-    # Show storage backend indicator (can be removed in production)
-    storage_type = "Turso" if config.storage.use_turso else "Google Cloud Storage"
-    st.sidebar.info(f"Using {storage_type} backend")
-    
     # Select rider
     rider = rider_selector()
     st.title('Welcome to Clipper TV!', anchor=False)
