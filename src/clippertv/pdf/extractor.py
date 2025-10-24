@@ -1,7 +1,5 @@
 """PDF extraction functions for ClipperTV."""
 
-from io import BytesIO
-import numpy as np
 import pandas as pd
 import camelot
 

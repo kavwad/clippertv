@@ -3,8 +3,8 @@
 ## Commands
 - Run app: `uv run python run_app.py` or `uv run streamlit run src/clippertv/app.py`
 - Install dev: `uv sync`
-- Run tests: `pytest tests/` (future)
-- Run single test: `uv run pytest tests/path_to_test.py::test_function_name` (future)
+- Run tests: `uv run pytest`
+- Run single test: `uv run pytest tests/path_to_test.py::test_function_name`
 - Format code: `uv run black src/ tests/`
 - Type check: `uv run mypy src/`
 

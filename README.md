@@ -15,9 +15,6 @@ ClipperTV is a Streamlit-based dashboard for visualizing Clipper card transit da
 
 ```
 clippertv/
-├── docs/
-│   ├── dev-notes.md      # Developer workflow references
-│   └── project-plan.md   # Modernization roadmap
 ├── src/
 │   └── clippertv/
 │       ├── app.py         # Main Streamlit app
@@ -42,15 +39,8 @@ clippertv/
 ## Installation
 
 1. Clone the repository
-2. Create a virtual environment (optional) and install dependencies with [uv](https://github.com/astral-sh/uv):
-
-```bash
-uv sync
-```
-
-3. Configure environment:
-   - Copy `.env.example` to `.env` and update with your credentials
-   - For Streamlit Cloud, set up the secrets in `.streamlit/secrets.toml`
+2. Install dependencies with [uv](https://github.com/astral-sh/uv)
+3. Set required secrets in `.streamlit/secrets.toml`
 
 ## Supabase Integration
 
@@ -74,39 +64,3 @@ Run the application with:
 ```bash
 uv run streamlit run src/clippertv/app.py
 ```
-
-or use the script entry point:
-
-```bash
-uv run clippertv
-```
-
-## Configuration
-
-The application can be configured with:
-
-### Environment Variables
-- `CLIPPERTV_STORAGE`: Set to `turso` (default) or `gcs` to choose backend
-- `SUPABASE_URL`: Your Supabase project URL
-- `SUPABASE_API_KEY`: Your Supabase API key
-- `TURSO_DATABASE_URL`: Turso connection string
-- `TURSO_AUTH_TOKEN`: Turso auth token
-
-### Streamlit Secrets
-Store the following in `.streamlit/secrets.toml`:
-
-```toml
-# For Google Cloud Storage
-gcs_key = '''{ "GCS JSON credentials" }'''
-
-# For Supabase
-supabase_url = "your-project-url.supabase.co"
-supabase_key = "your-supabase-api-key"
-
-# App protection
-password = "your-password-for-adding-trips"
-```
-
-## Backups and sample data
-
-Local backups, data exports, and PDF samples now live under `backups/`, which is ignored by Git to keep the repository lean. Store any large exports or sensitive files there.
