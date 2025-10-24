@@ -44,9 +44,8 @@ def create_pivot_month(df):
                   .unstack(fill_value=0)
                   )
 
-    # Sort by date and rename index to month and year
+    # Sort by date and rename index
     pivot_month.sort_index(ascending=False, inplace=True)
-    pivot_month.index = pivot_month.index.strftime('%b %Y')
     pivot_month.index.name = 'Month'
 
     # Reorder columns and remove 'Entrance' from column names
@@ -169,9 +168,8 @@ def create_pivot_month_cost(df):
     # Drop credit columns
     pivot_month_cost = pivot_month_cost['Debit']
 
-    # Sort by date and rename index to month and year
+    # Sort by date and rename index
     pivot_month_cost.sort_index(ascending=False, inplace=True)
-    pivot_month_cost.index = pivot_month_cost.index.strftime('%b %Y')
     pivot_month_cost.index.name = 'Month'
 
     # Reorder columns and rename BART Exit to BART

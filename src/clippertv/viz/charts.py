@@ -9,10 +9,6 @@ from clippertv.config import config
 
 def create_trip_chart(pivot_month):
     """Create chart showing monthly trips by category."""
-    # Convert index to datetime for proper display
-    pivot_month = pivot_month.copy()
-    pivot_month.index = pd.to_datetime(pivot_month.index, format='%b %Y')
-    
     # Create bar chart
     trip_chart = px.bar(
         pivot_month, 
@@ -36,10 +32,6 @@ def create_trip_chart(pivot_month):
 
 def create_cost_chart(pivot_month_cost):
     """Create chart showing monthly costs by category."""
-    # Convert index to datetime for proper display
-    pivot_month_cost = pivot_month_cost.copy()
-    pivot_month_cost.index = pd.to_datetime(pivot_month_cost.index, format='%b %Y')
-    
     # Create bar chart
     cost_chart = px.bar(
         pivot_month_cost, 
