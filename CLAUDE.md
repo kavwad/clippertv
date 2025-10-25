@@ -9,7 +9,6 @@
 - Type check: `uv run mypy src/`
 
 ### Turso Commands
-- Toggle storage backend: `CLIPPERTV_STORAGE=turso uv run python run_app.py`
 - Required env vars: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
 
 ## Code Style
@@ -27,7 +26,6 @@
 - Data layer (models, storage) in `data/` module
   - `models.py`: Pydantic data models
   - `schema.py`: Database schema definitions
-  - `store.py`: Google Cloud Storage implementation (legacy)
   - `turso_store.py`: Turso implementation (current)
   - `turso_client.py`: Turso connection management
   - `factory.py`: Data store factory (selects appropriate implementation)

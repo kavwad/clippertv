@@ -1,7 +1,6 @@
 """Main Streamlit app for ClipperTV."""
 
 import datetime
-import json
 import time
 import pandas as pd
 import streamlit as st
@@ -209,22 +208,8 @@ def display_manual_entry_section(rider):
 
 
 def initialize_data_store():
-    """Initialize the data store based on configuration."""
-    # Get GCS credentials from Streamlit secrets if available
-    gcs_key = None
-    gcs_credentials = (
-        st.secrets.get("connections", {})
-        .get("gcs", {})
-        .get("credentials_json")
-    )
-    if gcs_credentials:
-        try:
-            gcs_key = json.loads(gcs_credentials)
-        except (json.JSONDecodeError, TypeError):
-            st.error("Error loading GCS credentials from secrets.")
-    
-    # Create and return the appropriate data store
-    return get_data_store(gcs_key)
+    """Initialize and return the Turso data store."""
+    return get_data_store()
 
 
 def main():

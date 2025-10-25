@@ -9,7 +9,7 @@ ClipperTV is a Streamlit-based dashboard for visualizing Clipper card transit da
 - View monthly and yearly transit statistics
 - Compare transit usage between riders
 - Visualize transit usage with interactive charts
-- Store data in Turso (default) or Google Cloud Storage
+- Store data in Turso
 
 ## Project Structure
 
@@ -23,7 +23,6 @@ clippertv/
 │       │   ├── factory.py        # Data store factory
 │       │   ├── models.py         # Data models
 │       │   ├── schema.py         # Database schema
-│       │   ├── gcs_store.py      # Legacy GCS data storage
 │       │   ├── turso_client.py   # Turso connection helpers
 │       │   └── turso_store.py    # Turso data storage
 │       ├── pdf/
