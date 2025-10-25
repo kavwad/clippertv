@@ -12,77 +12,25 @@ import pandas as pd
 
 from clippertv.config import config
 from clippertv.data.factory import get_data_store
+from clippertv.pdf.categories import SORTED_CATEGORIZATION_RULES
 from clippertv.pdf.extractor import extract_trips_from_pdf, clean_up_extracted_data
 
 
-def categorize_trips(df_import):
-    """Categorize trips based on transaction type and location."""
-    # Initialize Category column
+def categorize_trips(df_import: pd.DataFrame) -> pd.DataFrame:
+    """Categorize trips using declarative regex-driven rules."""
     df_import['Category'] = None
+    uncategorized_mask = df_import['Category'].isna()
 
-    # AC Transit
-    df_import.loc[df_import['Location'] == 'ACT bus', 'Category'] = 'AC Transit'
-    
-    # BART
-    df_import.loc[
-        df_import['Transaction Type'] == 'Dual-tag entry transaction, no fare deduction', 
-        'Category'
-    ] = 'BART Entrance'
-    
-    df_import.loc[
-        df_import['Transaction Type'] == 'Dual-tag exit transaction, fare payment', 
-        'Category'
-    ] = 'BART Exit'
-    
-    # Cable Car
-    df_import.loc[df_import['Route'] == 'CC60', 'Category'] = 'Cable Car'
-    
-    # Caltrain
-    df_import.loc[
-        (df_import['Transaction Type'] == 'Dual-tag entry transaction, maximum fare deducted (purse debit)') &
-        (df_import['Route'].isna()), 
-        'Category'
-    ] = 'Caltrain Entrance'
-    
-    df_import.loc[
-        (df_import['Transaction Type'] == 'Dual-tag exit transaction, fare adjustment (purse rebate)') &
-        (df_import['Route'].isna()), 
-        'Category'
-    ] = 'Caltrain Exit'
-    
-    # Ferry
-    df_import.loc[
-        (df_import['Transaction Type'] == 'Dual-tag entry transaction, maximum fare deducted (purse debit)') &
-        (df_import['Route'] == 'FERRY'), 
-        'Category'
-    ] = 'Ferry Entrance'
-    
-    df_import.loc[
-        df_import['Location'].str[-5:] == '(GGF)', 
-        'Category'
-    ] = 'Ferry Entrance'
-    
-    df_import.loc[
-        (df_import['Transaction Type'] == 'Dual-tag exit transaction, fare adjustment (purse rebate)') &
-        (df_import['Route'] == 'FERRY'), 
-        'Category'
-    ] = 'Ferry Exit'
-    
-    # Muni
-    df_import.loc[df_import['Location'] == 'SFM bus', 'Category'] = 'Muni Bus'
-    df_import.loc[df_import['Route'] == 'NONE', 'Category'] = 'Muni Metro'
-    
-    # SamTrans
-    df_import.loc[df_import['Location'] == 'SAM bus', 'Category'] = 'SamTrans'
-    
-    # Reloads
-    df_import.loc[
-        (df_import['Transaction Type'] == 'Threshold auto-load at a TransLink Device') |
-        (df_import['Transaction Type'] == 'Add value at TOT or TVM') |
-        (df_import['Transaction Type'] == 'Remote create of new pass'), 
-        'Category'
-    ] = 'Reload'
-    
+    for rule in SORTED_CATEGORIZATION_RULES:
+        if not uncategorized_mask.any():
+            break
+
+        matches = rule.build_mask(df_import)
+        applicable = matches & uncategorized_mask
+        if applicable.any():
+            df_import.loc[applicable, 'Category'] = rule.category
+            uncategorized_mask = df_import['Category'].isna()
+
     return df_import
 
 
