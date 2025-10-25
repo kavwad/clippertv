@@ -1,0 +1,16 @@
+[Unit]
+Description=ClipperTV Monthly PDF Ingestion Timer
+Requires=clippertv-ingestion.service
+
+[Timer]
+# Run on the 2nd of each month at 2:00 AM
+OnCalendar=*-*-02 02:00:00
+
+# If system was off, run when it comes online
+Persistent=true
+
+# Randomize execution time by up to 5 minutes
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

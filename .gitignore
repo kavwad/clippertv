@@ -2,6 +2,10 @@
 backups/
 tmp/
 
+# Scheduler-generated files
+pdfs/
+logs/
+
 # Python cache
 __pycache__/
 *.py[cod]
