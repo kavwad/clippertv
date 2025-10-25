@@ -1,5 +1,6 @@
 """Turso-based data access layer for ClipperTV."""
 
+import hashlib
 import json
 from datetime import datetime
 from functools import lru_cache
@@ -14,6 +15,18 @@ from clippertv.data.turso_client import get_turso_client, initialize_database
 
 class TursoStore:
     """Data storage and retrieval using Turso for ClipperTV."""
+
+    _HASH_FIELDS: Tuple[str, ...] = (
+        'Transaction Date',
+        'Transaction Type',
+        'Category',
+        'Location',
+        'Route',
+        'Debit',
+        'Credit',
+        'Balance',
+        'Product'
+    )
 
     def __init__(self):
         """Initialize TursoStore with Turso client."""
@@ -35,6 +48,35 @@ class TursoStore:
         result = self.conn.execute("SELECT id, name FROM transit_modes")
         rows = result.fetchall()
         return {row[1]: row[0] for row in rows}  # name -> id
+
+    @staticmethod
+    def _serialize_for_hash(value: Any) -> Any:
+        """Normalize values so they are stable for hashing."""
+        if isinstance(value, pd.Timestamp):
+            timestamp = value
+        elif isinstance(value, datetime):
+            timestamp = pd.Timestamp(value)
+        else:
+            timestamp = None
+
+        if timestamp is not None:
+            if timestamp.tzinfo is not None:
+                timestamp = timestamp.tz_convert(None)
+            return timestamp.isoformat()
+
+        if pd.isna(value):
+            return None
+
+        return value
+
+    def _compute_row_hash(self, rider_id: str, row: pd.Series) -> str:
+        """Compute a deterministic hash for a transaction row."""
+        payload = {'rider_id': rider_id}
+        for field in self._HASH_FIELDS:
+            payload[field] = self._serialize_for_hash(row.get(field))
+
+        serialized = json.dumps(payload, sort_keys=True, separators=(',', ':'))
+        return hashlib.sha256(serialized.encode('utf-8')).hexdigest()
 
     def _get_transit_id(self, transit_name: str) -> Optional[int]:
         """Get the transit mode ID for a given name."""
@@ -163,70 +205,89 @@ class TursoStore:
         print(f"    Ensuring rider {rider_id} exists...", file=sys.stderr)
         self._ensure_rider_exists(rider_id)
 
-        # Get existing trip data to determine what to insert/update
-        print(f"    Fetching existing trips...", file=sys.stderr)
-        existing_trips = self._get_existing_trips(rider_id)
-        print(f"    Found {len(existing_trips)} existing trips in database", file=sys.stderr)
+        normalized_df = df.copy()
+        normalized_df['Transaction Date'] = pd.to_datetime(
+            normalized_df['Transaction Date'],
+            utc=True,
+            errors='coerce'
+        ).dt.tz_convert(None)
 
-        # Process the dataframe into trips
-        print(f"    Processing {len(df)} rows...", file=sys.stderr)
+        print(f"    Processing {len(normalized_df)} rows...", file=sys.stderr)
+        normalized_df['_content_hash'] = normalized_df.apply(
+            lambda row: self._compute_row_hash(rider_id, row),
+            axis=1
+        )
+
+        existing_hashes = self._get_existing_hashes(rider_id)
+        known_hashes = set(existing_hashes.keys())
+        rows_to_persist = normalized_df[
+            ~normalized_df['_content_hash'].isin(known_hashes)
+        ].copy()
+        rows_to_persist = rows_to_persist[
+            ~rows_to_persist['_content_hash'].duplicated()
+        ]
+
+        cache_df = normalized_df.drop(columns=['_content_hash'])
+
+        if rows_to_persist.empty:
+            print("    No new or updated transactions detected.", file=sys.stderr)
+            self._cache[rider_id] = cache_df
+            return
+
+        print(f"    {len(rows_to_persist)} rows require persistence.", file=sys.stderr)
+        existing_trips = self._get_existing_trips(rider_id)
+        print(f"    Loaded {len(existing_trips)} existing trip keys for comparison.", file=sys.stderr)
+
         processed_count = 0
-        for _, row in df.iterrows():
+        for _, row in rows_to_persist.iterrows():
             processed_count += 1
             if processed_count % 50 == 0:
-                print(f"      Processed {processed_count}/{len(df)} rows...", file=sys.stderr)
-            # Skip if transaction date is missing
-            if pd.isna(row['Transaction Date']):
+                print(f"      Upserting {processed_count}/{len(rows_to_persist)} rows...", file=sys.stderr)
+
+            timestamp = row['Transaction Date']
+            if pd.isna(timestamp):
                 continue
 
-            # Parse category to get transit mode and transaction type
+            transaction_date = pd.Timestamp(timestamp).isoformat()
             category = row.get('Category')
             transit_id, normalized_transaction_type = self._parse_category(category)
-
-            # Convert datetime to ISO string
-            transaction_date = row['Transaction Date'].isoformat()
-
-            # Use the normalized transaction type if we parsed it, otherwise use the original
             transaction_type = normalized_transaction_type or row.get('Transaction Type', 'manual')
-
-            # Create trip data
             location = None if pd.isna(row.get('Location')) else row.get('Location')
             route = None if pd.isna(row.get('Route')) else row.get('Route')
             debit = None if pd.isna(row.get('Debit')) else float(row.get('Debit'))
             credit = None if pd.isna(row.get('Credit')) else float(row.get('Credit'))
             balance = None if pd.isna(row.get('Balance')) else float(row.get('Balance'))
             product = None if pd.isna(row.get('Product')) else row.get('Product')
+            row_hash = row['_content_hash']
 
-            # Check if trip already exists using a more robust composite key
-            # Include location, debit, and credit to handle multiple trips at the same time
             key = (transaction_date, transaction_type, location, debit, credit)
-            if key in existing_trips:
-                # Update existing trip
-                trip_id = existing_trips[key]
+            trip_id = existing_trips.get(key)
+
+            if trip_id:
                 self.conn.execute("""
                     UPDATE trips
                     SET transit_id = ?, location = ?, route = ?,
                         debit = ?, credit = ?, balance = ?, product = ?,
-                        updated_at = datetime('now')
+                        content_hash = ?, updated_at = datetime('now')
                     WHERE id = ?
-                """, [transit_id, location, route, debit, credit, balance, product, trip_id])
+                """, [transit_id, location, route, debit, credit, balance,
+                      product, row_hash, trip_id])
             else:
-                # Insert new trip
-                self.conn.execute("""
+                cursor = self.conn.execute("""
                     INSERT INTO trips (
                         rider_id, transit_id, transaction_type, transaction_date,
-                        location, route, debit, credit, balance, product
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        location, route, debit, credit, balance, product, content_hash
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, [rider_id, transit_id, transaction_type, transaction_date,
-                      location, route, debit, credit, balance, product])
+                      location, route, debit, credit, balance, product, row_hash])
+                if cursor.lastrowid:
+                    existing_trips[key] = cursor.lastrowid
 
-        # Commit changes
         print(f"    Committing changes to database...", file=sys.stderr)
         self.conn.commit()
         print(f"    Committed successfully!", file=sys.stderr)
 
-        # Update cache
-        self._cache[rider_id] = df
+        self._cache[rider_id] = cache_df
 
     def _parse_category(self, category: Optional[str]) -> Tuple[Optional[int], Optional[str]]:
         """Parse a category string to extract transit mode ID and transaction type.
@@ -275,6 +336,18 @@ class TursoStore:
             (row[1], row[2], row[3], row[4], row[5]): row[0]
             for row in rows
         }
+
+    def _get_existing_hashes(self, rider_id: str) -> Dict[str, int]:
+        """Return mapping of content hashes to trip IDs for a rider."""
+        result = self.conn.execute(
+            """
+            SELECT content_hash, id
+            FROM trips
+            WHERE rider_id = ? AND content_hash IS NOT NULL
+            """,
+            [rider_id]
+        )
+        return {row[0]: row[1] for row in result.fetchall()}
 
     def get_rider_data(self, rider_id: str) -> RiderData:
         """Get rider data as a RiderData model."""

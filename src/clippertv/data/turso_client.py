@@ -146,10 +146,23 @@ def initialize_database(force: bool = False) -> None:
             """
         )
 
+        trips_columns = {
+            row[1] for row in conn.execute("PRAGMA table_info(trips)").fetchall()
+        }
+        if "content_hash" not in trips_columns:
+            conn.execute("ALTER TABLE trips ADD COLUMN content_hash TEXT")
+
         # Create indices
         conn.execute("CREATE INDEX IF NOT EXISTS trips_rider_id_idx ON trips(rider_id)")
         conn.execute(
             "CREATE INDEX IF NOT EXISTS trips_transaction_date_idx ON trips(transaction_date)"
+        )
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS trips_rider_hash_idx
+            ON trips(rider_id, content_hash)
+            WHERE content_hash IS NOT NULL
+            """
         )
 
         # Seed transit modes if empty
