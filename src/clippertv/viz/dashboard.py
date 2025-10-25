@@ -198,16 +198,20 @@ def process_data(df):
 
 def calculate_summary_stats(pivot_month, pivot_month_cost, df):
     """Calculate summary statistics for the dashboard."""
-    # Trips and cost for current month
-    trips_this_month = pivot_month.iloc[0].sum()
-    cost_this_month = pivot_month_cost.iloc[0].sum().round().astype(int)
-    
-    # Difference from previous month
-    trip_diff = pivot_month.iloc[1].sum() - pivot_month.iloc[0].sum()
+    current_month_trips = pivot_month.iloc[0]
+    current_month_costs = pivot_month_cost.iloc[0]
+    trips_this_month = current_month_trips.sum()
+    cost_this_month = current_month_costs.sum().round().astype(int)
+
+    has_previous_month = len(pivot_month) > 1
+    previous_month_trips = pivot_month.iloc[1].sum() if has_previous_month else trips_this_month
+    previous_month_costs = (pivot_month_cost.iloc[1].sum().round().astype(int)
+                            if has_previous_month else cost_this_month)
+
+    trip_diff = previous_month_trips - trips_this_month
     trip_diff_text = "fewer" if trip_diff >= 0 else "more"
-    
-    cost_diff = (pivot_month_cost.iloc[1].sum() - 
-                pivot_month_cost.iloc[0].sum()).round().astype(int)
+
+    cost_diff = previous_month_costs - cost_this_month
     cost_diff_text = "less" if cost_diff >= 0 else "more"
     
     # Most recent date and data for current month
@@ -246,7 +250,7 @@ def calculate_summary_stats(pivot_month, pivot_month_cost, df):
         'cost_diff_text': cost_diff_text,
         'most_recent_date': most_recent_date,
         'pass_upshot': pass_upshot,
-        'most_used_mode': pivot_month.iloc[0].idxmax()
+        'most_used_mode': current_month_trips.idxmax()
     }
 
 
