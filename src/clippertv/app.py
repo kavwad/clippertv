@@ -38,19 +38,15 @@ def rider_selector():
     )
 
 
+@st.cache_resource(show_spinner=False)
+def get_cached_data_store():
+    """Return a cached data store instance for the app runtime."""
+    return get_data_store()
+
+
 def load_and_process_rider_data(rider):
     """Load rider data and process it for display."""
-    # Get data store instance from the current function scope
-    data_store = st.session_state.get("data_store")
-    if data_store is None:
-        # Initialize if not available
-        data_store = initialize_data_store()
-        st.session_state["data_store"] = data_store
-    
-    # Load data from data store
-    df = data_store.load_data(rider)
-    
-    # Process data into pivot tables
+    df = get_cached_data_store().load_data(rider)
     return process_data(df)
 
 
@@ -84,12 +80,7 @@ def display_add_trips_section(rider):
 
 def display_pdf_import_section(rider):
     """Display the PDF import section."""
-    # Get data store from session state
-    data_store = st.session_state.get("data_store")
-    if data_store is None:
-        data_store = initialize_data_store()
-        st.session_state["data_store"] = data_store
-    
+    data_store = get_cached_data_store()
     pdfs = st.file_uploader(
         'Upload Clipper activity pdf',
         type='pdf',
@@ -118,12 +109,7 @@ def display_pdf_import_section(rider):
 
 def display_manual_entry_section(rider):
     """Display the manual entry section."""
-    # Get data store from session state
-    data_store = st.session_state.get("data_store")
-    if data_store is None:
-        data_store = initialize_data_store()
-        st.session_state["data_store"] = data_store
-    
+    data_store = get_cached_data_store()
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -207,18 +193,10 @@ def display_manual_entry_section(rider):
                 st.rerun()
 
 
-def initialize_data_store():
-    """Initialize and return the Turso data store."""
-    return get_data_store()
-
-
 def main():
     """Run the ClipperTV Streamlit app."""
     setup_page()
-    
-    # Initialize data store and save it in session state
-    data_store = initialize_data_store()
-    st.session_state["data_store"] = data_store
+    data_store = get_cached_data_store()
     
     # Select rider
     rider = rider_selector()
