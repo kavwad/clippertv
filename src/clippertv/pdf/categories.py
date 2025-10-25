@@ -186,7 +186,7 @@ CATEGORIZATION_RULES: tuple[CategorizationRule, ...] = (
     ),
     _rule(
         category="Reload",
-        precedence=30,
+        precedence=110,
         conditions=(
             {
                 "column": "Transaction Type",
