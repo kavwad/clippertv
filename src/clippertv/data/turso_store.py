@@ -38,6 +38,7 @@ class TursoStore:
 
         # Set up cache
         self._cache: Dict[str, pd.DataFrame] = {}
+        self._cache_tokens: Dict[str, Tuple[str, str, int]] = {}
 
         # Get transit mode mappings
         self._transit_ids = self._get_transit_mode_ids()
@@ -101,10 +102,44 @@ class TursoStore:
         """Load a rider's data from Turso."""
         return self.load_multiple_riders([rider_id])[rider_id]
 
+    def _fetch_cache_token(self, rider_id: str) -> Tuple[str, str, int]:
+        """Return a token describing the current DB state for a rider."""
+        result = self.conn.execute(
+            """
+            SELECT
+                COALESCE(MAX(updated_at), ''),
+                COALESCE(MAX(transaction_date), ''),
+                COUNT(*)
+            FROM trips
+            WHERE rider_id = ?
+            """,
+            [rider_id]
+        )
+        row = result.fetchone()
+        if not row:
+            return ('', '', 0)
+        updated_at, latest_trip, row_count = row
+        return (
+            updated_at or '',
+            latest_trip or '',
+            int(row_count or 0)
+        )
+
     def load_multiple_riders(self, rider_ids: List[str]) -> Dict[str, pd.DataFrame]:
         """Load data for multiple riders with a single query where possible."""
+        missing: List[str] = []
+        for rider_id in rider_ids:
+            if rider_id not in self._cache:
+                missing.append(rider_id)
+                continue
+
+            cached_token = self._cache_tokens.get(rider_id)
+            current_token = self._fetch_cache_token(rider_id)
+            if cached_token != current_token:
+                self.invalidate_cache(rider_id)
+                missing.append(rider_id)
+
         # Separate which rider data we already have cached
-        missing = [r for r in rider_ids if r not in self._cache]
 
         if missing:
             for rider_id in missing:
@@ -171,6 +206,7 @@ class TursoStore:
                     df['Transaction Date'] = pd.to_datetime(df['Transaction Date'])
 
                 self._cache[rider_id] = df
+                self._cache_tokens[rider_id] = self._fetch_cache_token(rider_id)
 
         return {rider_id: self._cache[rider_id] for rider_id in rider_ids}
 
@@ -232,6 +268,7 @@ class TursoStore:
         if rows_to_persist.empty:
             print("    No new or updated transactions detected.", file=sys.stderr)
             self._cache[rider_id] = cache_df
+            self._cache_tokens[rider_id] = self._fetch_cache_token(rider_id)
             return
 
         print(f"    {len(rows_to_persist)} rows require persistence.", file=sys.stderr)
@@ -288,6 +325,7 @@ class TursoStore:
         print(f"    Committed successfully!", file=sys.stderr)
 
         self._cache[rider_id] = cache_df
+        self._cache_tokens[rider_id] = self._fetch_cache_token(rider_id)
 
     def _parse_category(self, category: Optional[str]) -> Tuple[Optional[int], Optional[str]]:
         """Parse a category string to extract transit mode ID and transaction type.
@@ -391,5 +429,8 @@ class TursoStore:
         if rider_id:
             if rider_id in self._cache:
                 del self._cache[rider_id]
+            if rider_id in self._cache_tokens:
+                del self._cache_tokens[rider_id]
         else:
             self._cache.clear()
+            self._cache_tokens.clear()

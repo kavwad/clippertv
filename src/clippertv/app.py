@@ -53,7 +53,14 @@ def load_and_process_rider_data(rider):
 def display_add_trips_section(rider):
     """Display the section for adding trips."""
     st.divider()
-    with st.expander('Add trips'):
+    with st.expander('Admin'):
+        data_store = get_cached_data_store()
+        refresh_col, spacer_col = st.columns([1, 3])
+        with refresh_col:
+            if st.button('Refresh data', use_container_width=True):
+                data_store.invalidate_cache(rider)
+                st.rerun()
+
         password = st.text_input('Enter password', type='password')
         configured_password = (
             st.secrets.get("streamlit", {})
@@ -196,10 +203,10 @@ def display_manual_entry_section(rider):
 def main():
     """Run the ClipperTV Streamlit app."""
     setup_page()
-    data_store = get_cached_data_store()
     
     # Select rider
     rider = rider_selector()
+
     st.title('Welcome to Clipper TV!', anchor=False)
     
     # Load and process data
@@ -209,10 +216,10 @@ def main():
     trip_chart = create_trip_chart(pivot_month)
     cost_chart = create_cost_chart(pivot_month_cost)
     bike_walk_chart = create_bike_walk_chart()
-    comparison_chart = create_comparison_chart(config.riders, data_store)
+    comparison_chart = create_comparison_chart(config.riders, get_cached_data_store())
     
     # Calculate summary statistics
-    stats = calculate_summary_stats(pivot_month, pivot_month_cost, data_store.load_data(rider))
+    stats = calculate_summary_stats(pivot_month, pivot_month_cost, get_cached_data_store().load_data(rider))
     
     # Display summary statistics
     display_summary(rider, stats, pivot_month, pivot_year, pivot_year_cost)
