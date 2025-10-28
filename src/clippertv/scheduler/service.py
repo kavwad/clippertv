@@ -15,22 +15,23 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
-from apscheduler.schedulers.blocking import BlockingScheduler
-from apscheduler.triggers.cron import CronTrigger
+import requests
 
 # Import downloader functions
 from clippertv.pdf.downloader import (
-    load_config,
     login,
     download_pdfs,
     process_downloaded_pdfs,
 )
-import requests
+# Import auth/data services
+from clippertv.auth.service import AuthService
+from clippertv.auth.crypto import CredentialEncryption
+from clippertv.data.user_store import UserStore
+from clippertv.data.turso_client import get_turso_client
 
 
 # Configuration
 PDF_DIR = Path("pdfs")
-CONFIG_FILE = ".streamlit/secrets.toml"
 LOG_DIR = Path("logs")
 USER_AGENT = "clipper-pdf-scheduler/1.0"
 
@@ -184,23 +185,39 @@ def run_monthly_ingestion():
         logger.info("Starting monthly Clipper PDF ingestion")
         logger.info("=" * 60)
 
-        # Load configuration
-        logger.info(f"Loading configuration from {CONFIG_FILE}")
+        # Initialize database and user store
+        logger.info("Connecting to database...")
         try:
-            config_data = load_config(CONFIG_FILE)
+            jwt_secret = os.getenv("JWT_SECRET_KEY")
+            encryption_key = os.getenv("ENCRYPTION_KEY")
+
+            if not jwt_secret or not encryption_key:
+                logger.error("JWT_SECRET_KEY and ENCRYPTION_KEY must be set in environment")
+                return
+
+            client = get_turso_client()
+            auth = AuthService(secret_key=jwt_secret)
+            crypto = CredentialEncryption(encryption_key=encryption_key)
+            user_store = UserStore(client, auth, crypto)
         except Exception as e:
-            logger.error(f"Failed to load config: {e}")
+            logger.error(f"Failed to initialize database: {e}", exc_info=True)
             return
 
-        clipper_cfg = config_data.get("clipper", {})
-        users = clipper_cfg.get("users", {})
-        rider_accounts = clipper_cfg.get("rider_accounts", {})
+        # Get all users from database
+        logger.info("Loading users from database...")
+        try:
+            # Get all users - we'll need to query the database directly for this
+            result = client.execute("SELECT id, email, name FROM users")
+            users = result.fetchall()
 
-        if not users:
-            logger.error("No users configured in config file")
+            if not users:
+                logger.error("No users found in database")
+                return
+
+            logger.info(f"Found {len(users)} user(s)")
+        except Exception as e:
+            logger.error(f"Failed to load users: {e}", exc_info=True)
             return
-
-        logger.info(f"Found {len(users)} configured user(s)")
 
         # Calculate last month's date range
         today = datetime.now().date()
@@ -219,41 +236,75 @@ def run_monthly_ingestion():
 
         # Download PDFs for all users
         all_saved_files = []
+        # Build rider_accounts mapping for ingestion
+        rider_accounts = {}
 
-        for username, user_config in users.items():
-            email = user_config.get("email")
-            password = user_config.get("password")
+        for user_row in users:
+            user_id, email, name = user_row[0], user_row[1], user_row[2]
+            logger.info(f"Processing user: {name or email}")
 
-            if not email or not password:
-                logger.warning(f"Skipping user {username}: missing credentials")
-                continue
-
-            logger.info(f"Processing user: {username} ({email})")
-
-            session = requests.Session()
-            session.headers.update({"User-Agent": USER_AGENT})
-
+            # Get all Clipper cards for this user
             try:
-                # Login
-                logger.info(f"Logging in as {username}...")
-                login(session, email, password)
-                logger.info("Login successful")
+                cards = user_store.get_user_clipper_cards(user_id)
 
-                # Download PDFs
-                logger.info("Downloading PDFs...")
-                saved_files = download_pdfs(
-                    session,
-                    str(temp_download_dir),
-                    start_date,
-                    end_date,
-                    dry_run=False
-                )
+                if not cards:
+                    logger.warning(f"No Clipper cards found for {name or email}")
+                    continue
 
-                all_saved_files.extend(saved_files)
-                logger.info(f"Downloaded {len(saved_files)} PDF(s) for {username}")
+                logger.info(f"Found {len(cards)} card(s) for {name or email}")
+
+                # Download PDFs for each card
+                for card in cards:
+                    # Get decrypted credentials
+                    creds = user_store.get_decrypted_credentials(card.id)
+                    if not creds:
+                        logger.warning(f"No credentials for card {card.card_number}")
+                        continue
+
+                    clipper_email = creds.get("username")  # username is the email
+                    clipper_password = creds.get("password")
+
+                    logger.info(f"  Downloading for card {card.card_number} ({clipper_email})")
+
+                    session = requests.Session()
+                    session.headers.update({"User-Agent": USER_AGENT})
+
+                    try:
+                        # Login to Clipper website
+                        logger.info(f"    Logging in...")
+                        login(session, clipper_email, clipper_password)
+                        logger.info("    Login successful")
+
+                        # Download PDFs
+                        logger.info("    Downloading PDFs...")
+                        saved_files = download_pdfs(
+                            session,
+                            str(temp_download_dir),
+                            start_date,
+                            end_date,
+                            dry_run=False
+                        )
+
+                        # Tag files with card info for ingestion (expected format)
+                        for file_info in saved_files:
+                            file_info['card'] = {'serial': card.card_number}
+
+                        all_saved_files.extend(saved_files)
+                        logger.info(f"    Downloaded {len(saved_files)} PDF(s)")
+
+                        # Build rider_accounts mapping (card_number -> user identifier)
+                        # Use first letter of name or email
+                        rider_id = (name[0] if name else email[0]).upper()
+                        if rider_id not in rider_accounts:
+                            rider_accounts[rider_id] = []
+                        if card.card_number not in rider_accounts[rider_id]:
+                            rider_accounts[rider_id].append(card.card_number)
+
+                    except Exception as e:
+                        logger.error(f"    Error downloading for card {card.card_number}: {e}", exc_info=True)
 
             except Exception as e:
-                logger.error(f"Error processing user {username}: {e}", exc_info=True)
+                logger.error(f"Error processing user {name or email}: {e}", exc_info=True)
 
         if not all_saved_files:
             logger.warning("No PDFs were downloaded")
@@ -294,32 +345,6 @@ def run_monthly_ingestion():
         raise
 
 
-def main():
-    """Main scheduler entry point."""
-    logger = setup_logging()
-    logger.info("ClipperTV PDF Scheduler starting...")
-
-    # Create scheduler
-    scheduler = BlockingScheduler()
-
-    # Schedule monthly job: 2nd of month at 2 AM
-    scheduler.add_job(
-        run_monthly_ingestion,
-        CronTrigger(day=2, hour=2, minute=0),
-        id='monthly_clipper_ingestion',
-        name='Monthly Clipper PDF Ingestion',
-        misfire_grace_time=3600,  # Allow 1 hour grace period if Pi was offline
-    )
-
-    logger.info("Scheduled monthly ingestion: 2nd of month at 2:00 AM")
-    logger.info("Press Ctrl+C to exit")
-
-    try:
-        scheduler.start()
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("Scheduler stopped by user")
-        scheduler.shutdown()
-
-
-if __name__ == "__main__":
-    main()
+# NOTE: main() function removed - we use systemd timer instead of APScheduler
+# For systemd timer, use: python -m clippertv.scheduler.run_ingestion
+# For APScheduler version, see git history

@@ -4,9 +4,12 @@ Clipper PDF Downloader: download PDF transaction reports for one or more users v
 """
 import argparse
 import os
+import re
 import sys
 from collections import defaultdict
 from datetime import datetime, date, timedelta
+from pathlib import Path
+from typing import Any, Optional, Tuple
 
 import requests
 from bs4 import BeautifulSoup
@@ -16,6 +19,7 @@ from clippertv.pdf.processor import process_pdf_statements
 
 HOST = "https://www.clippercard.com"
 USER_AGENT = "clipper-pdf-downloader/0.1"
+_CARD_SERIAL_PATTERN = re.compile(r"clipper[-_]?transactions[-_]?(\d+)", re.IGNORECASE)
 
 
 def parse_args():
@@ -208,22 +212,96 @@ def download_pdfs(session, output_dir, start_date, end_date, dry_run):
     return saved_files
 
 
+def _extract_serial_from_filename(path: str) -> Optional[str]:
+    """Infer a Clipper card serial from a saved PDF filename."""
+    stem = Path(path).stem
+    match = _CARD_SERIAL_PATTERN.search(stem)
+    if match:
+        return match.group(1)
+    return None
+
+
+def _normalize_saved_file_entry(entry: Any) -> Tuple[str, Optional[str]]:
+    """
+    Normalize saved file metadata produced by downloader or scheduler.
+
+    Returns:
+        Tuple of (path, serial) where serial may be None if unavailable.
+    """
+    path: Optional[str] = None
+    serial: Optional[str] = None
+
+    if isinstance(entry, (str, os.PathLike)):
+        path = str(entry)
+    elif isinstance(entry, dict):
+        raw_path = (
+            entry.get("path")
+            or entry.get("file")
+            or entry.get("filepath")
+            or entry.get("filename")
+        )
+        if raw_path:
+            path = str(raw_path)
+
+        card_info = entry.get("card")
+        if isinstance(card_info, dict):
+            serial_candidate = (
+                card_info.get("serial")
+                or card_info.get("card_number")
+                or card_info.get("card")
+            )
+            if serial_candidate:
+                serial = str(serial_candidate)
+        elif isinstance(card_info, (str, int)):
+            serial = str(card_info)
+        elif card_info is not None:
+            serial = str(card_info)
+
+        if not serial:
+            serial_candidate = (
+                entry.get("serial")
+                or entry.get("card_serial")
+                or entry.get("card_number")
+            )
+            if serial_candidate:
+                serial = str(serial_candidate)
+    else:
+        path = str(entry)
+
+    if path and not serial:
+        serial = _extract_serial_from_filename(path)
+
+    if not path:
+        raise ValueError(f"Saved file entry is missing a path: {entry}")
+
+    if serial:
+        serial = serial.strip() or None
+
+    return path, serial
+
+
 def group_pdfs_by_rider(saved_files, rider_accounts):
     """Group downloaded PDFs by rider identifier based on account mapping."""
     files_by_rider = defaultdict(list)
     unmatched = []
 
-    for item in saved_files:
-        card_serial = str(item["card"]["serial"])
+    for entry in saved_files:
+        try:
+            path, card_serial = _normalize_saved_file_entry(entry)
+        except ValueError:
+            unmatched.append("<unknown>")
+            continue
+
         rider = None
         for rider_id, accounts in rider_accounts.items():
             if card_serial in {str(acc) for acc in accounts}:
                 rider = rider_id
                 break
+
         if rider:
-            files_by_rider[rider].append(item["path"])
+            files_by_rider[rider].append(path)
         else:
-            unmatched.append(card_serial)
+            unmatched.append(card_serial or Path(path).name)
 
     return files_by_rider, unmatched
 
