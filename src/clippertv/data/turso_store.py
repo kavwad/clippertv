@@ -98,9 +98,18 @@ class TursoStore:
             )
             self.conn.commit()
 
-    def load_data(self, rider_id: str) -> pd.DataFrame:
-        """Load a rider's data from Turso."""
-        return self.load_multiple_riders([rider_id])[rider_id]
+    def load_data(self, rider_id: str, user_id: Optional[str] = None) -> pd.DataFrame:
+        """
+        Load a rider's data from Turso.
+
+        Args:
+            rider_id: Rider identifier
+            user_id: Optional user ID for row-level security filtering
+
+        Returns:
+            DataFrame with rider's transactions
+        """
+        return self.load_multiple_riders([rider_id], user_id=user_id)[rider_id]
 
     def _fetch_cache_token(self, rider_id: str) -> Tuple[str, str, int]:
         """Return a token describing the current DB state for a rider."""
@@ -125,8 +134,17 @@ class TursoStore:
             int(row_count or 0)
         )
 
-    def load_multiple_riders(self, rider_ids: List[str]) -> Dict[str, pd.DataFrame]:
-        """Load data for multiple riders with a single query where possible."""
+    def load_multiple_riders(self, rider_ids: List[str], user_id: Optional[str] = None) -> Dict[str, pd.DataFrame]:
+        """
+        Load data for multiple riders with a single query where possible.
+
+        Args:
+            rider_ids: List of rider identifiers
+            user_id: Optional user ID for row-level security filtering
+
+        Returns:
+            Dictionary mapping rider_id to DataFrame
+        """
         missing: List[str] = []
         for rider_id in rider_ids:
             if rider_id not in self._cache:
@@ -146,6 +164,14 @@ class TursoStore:
                 self._ensure_rider_exists(rider_id)
 
             placeholders = ",".join("?" for _ in missing)
+
+            # Build query with optional user_id filtering
+            query_params = list(missing)
+            user_filter = ""
+            if user_id:
+                user_filter = " AND t.user_id = ?"
+                query_params.append(user_id)
+
             query = f"""
                 SELECT
                     t.rider_id,
@@ -160,11 +186,11 @@ class TursoStore:
                     t.product
                 FROM trips t
                 LEFT JOIN transit_modes tm ON t.transit_id = tm.id
-                WHERE t.rider_id IN ({placeholders})
+                WHERE t.rider_id IN ({placeholders}){user_filter}
                 ORDER BY t.rider_id, t.transaction_date DESC
             """
 
-            result = self.conn.execute(query, missing)
+            result = self.conn.execute(query, query_params)
             rows = result.fetchall()
 
             grouped: Dict[str, List[Dict[str, Any]]] = {r: [] for r in missing}
@@ -234,8 +260,15 @@ class TursoStore:
         # All other modes don't use entrance/exit in their category name
         return transit_mode
 
-    def save_data(self, rider_id: str, df: pd.DataFrame) -> None:
-        """Save a rider's data to Turso."""
+    def save_data(self, rider_id: str, df: pd.DataFrame, user_id: Optional[str] = None) -> None:
+        """
+        Save a rider's data to Turso.
+
+        Args:
+            rider_id: Rider identifier
+            df: DataFrame with transaction data
+            user_id: Optional user ID for row-level security
+        """
         import sys
         # Ensure rider exists
         print(f"    Ensuring rider {rider_id} exists...", file=sys.stderr)
@@ -305,18 +338,18 @@ class TursoStore:
                     UPDATE trips
                     SET transit_id = ?, location = ?, route = ?,
                         debit = ?, credit = ?, balance = ?, product = ?,
-                        content_hash = ?, updated_at = datetime('now')
+                        content_hash = ?, user_id = ?, updated_at = datetime('now')
                     WHERE id = ?
                 """, [transit_id, location, route, debit, credit, balance,
-                      product, row_hash, trip_id])
+                      product, row_hash, user_id, trip_id])
             else:
                 cursor = self.conn.execute("""
                     INSERT INTO trips (
                         rider_id, transit_id, transaction_type, transaction_date,
-                        location, route, debit, credit, balance, product, content_hash
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        location, route, debit, credit, balance, product, content_hash, user_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, [rider_id, transit_id, transaction_type, transaction_date,
-                      location, route, debit, credit, balance, product, row_hash])
+                      location, route, debit, credit, balance, product, row_hash, user_id])
                 if cursor.lastrowid:
                     existing_trips[key] = cursor.lastrowid
 
