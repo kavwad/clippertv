@@ -1,34 +1,60 @@
 # ClipperTV Development Guide
 
-## Commands
-- Run app: `uv run python run_app.py` or `uv run streamlit run src/clippertv/app.py`
-- Install dev: `uv sync`
-- Run tests: `uv run pytest`
-- Run single test: `uv run pytest tests/path_to_test.py::test_function_name`
-- Format code: `uv run black src/ tests/`
-- Type check: `uv run mypy src/`
+## Quick Commands
+```bash
+# Run app
+uv run streamlit run src/clippertv/app.py
 
-### Turso Commands
-- Required env vars: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
+# Tests
+uv run pytest                        # All tests
+uv run pytest tests/test_auth.py -v  # Auth tests
+uv run pytest -k test_name           # Specific test
 
-## Code Style
-- **Imports**: Group imports in order: standard library, third-party, local
-- **Types**: Use type hints with all function signatures (typing module)
-- **Docstrings**: Use triple-quoted docstrings for all modules, classes, and functions
-- **Classes**: Prefer Pydantic models for structured data
-- **Naming**: snake_case for variables/functions, CamelCase for classes
-- **Error handling**: Use specific exceptions with meaningful messages
-- **Modules**: Keep modules focused on single responsibility
-- **Functions**: Keep functions small, under 30 lines when possible
-- **Line length**: Max 88 characters per line
+# Environment
+uv run python scripts/test_env.py    # Validate env setup
+uv run python migrations/run_migration.py  # Run DB migration
+
+# Formatting
+uv run black src/ tests/
+uv run mypy src/
+```
 
 ## Architecture
-- Data layer (models, storage) in `data/` module
-  - `models.py`: Pydantic data models
-  - `schema.py`: Database schema definitions
-  - `turso_store.py`: Turso implementation (current)
-  - `turso_client.py`: Turso connection management
-  - `factory.py`: Data store factory (selects appropriate implementation)
-- PDF processing in `pdf/` module
-- Visualization components in `viz/` module
-- Main app in `app.py`
+
+### Data Layer (`src/clippertv/data/`)
+- `models.py` - Pydantic models (TransitTransaction, User, ClipperCard, etc.)
+- `turso_store.py` - Transaction storage with optional user_id filtering
+- `user_store.py` - User/ClipperCard CRUD operations
+- `turso_client.py` - Database connection management
+- `factory.py` - Data store factory
+
+### Authentication (`src/clippertv/auth/`)
+- `service.py` - AuthService (JWT tokens, password hashing with bcrypt)
+- `crypto.py` - CredentialEncryption (Fernet encryption for Clipper credentials)
+
+### Configuration (`src/clippertv/config.py`)
+- `AppConfig` - App settings (transit categories, colors)
+- `EnvConfig` - Environment variables (DB, JWT, encryption keys)
+
+### Key Environment Variables
+Required in `.env`:
+- `TURSO_DATABASE_URL` - Database URL
+- `TURSO_AUTH_TOKEN` - Database auth token
+- `JWT_SECRET_KEY` - For JWT signing (generate: `openssl rand -hex 32`)
+- `ENCRYPTION_KEY` - For credential encryption (generate: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`)
+
+## Code Style
+- **Imports**: stdlib → third-party → local
+- **Types**: Always use type hints
+- **Docstrings**: All modules, classes, functions
+- **Models**: Use Pydantic
+- **Naming**: snake_case (variables/functions), CamelCase (classes)
+- **Line length**: Max 88 characters
+
+## Testing
+- Auth: `tests/test_auth.py` (13 tests)
+- User store: `tests/test_user_store.py` (14 tests)
+- Use pytest fixtures for DB client, auth service, crypto
+
+## Phase 1 Status ✅
+Multi-user backend complete. See [PLAN.md](PLAN.md) for next steps.

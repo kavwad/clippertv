@@ -1,49 +1,56 @@
 # ClipperTV
 
-ClipperTV is a Streamlit-based dashboard for visualizing Clipper card transit data. It provides insights into transit usage patterns, costs, and trends.
+Transit usage dashboard with multi-user authentication. Track Clipper card activity, visualize spending patterns, and get automated monthly reports.
 
 ## Features
 
-- Upload and process Clipper card activity PDFs
-- Manually add transit trips
-- View monthly and yearly transit statistics
-- Compare transit usage between riders
-- Visualize transit usage with interactive charts
-- Store data in Turso
+- **Multi-user authentication** with JWT tokens
+- **Encrypted credential storage** for automated PDF downloads
+- **Upload and process** Clipper card activity PDFs
+- **Manual trip entry** for missing transactions
+- **Interactive visualizations** of transit usage and costs
+- **Turso database** with row-level security
+
+## Quick Start
+
+```bash
+# Install dependencies
+uv sync
+
+# Run database migration
+uv run python migrations/run_migration.py
+
+# Validate environment setup
+uv run python scripts/test_env.py
+
+# Start the app
+uv run streamlit run src/clippertv/app.py
+```
 
 ## Project Structure
 
 ```
 clippertv/
-├── src/
-│   └── clippertv/
-│       ├── app.py         # Main Streamlit app
-│       ├── config.py      # Configuration management
-│       ├── data/
-│       │   ├── factory.py        # Data store factory
-│       │   ├── models.py         # Data models
-│       │   ├── schema.py         # Database schema
-│       │   ├── turso_client.py   # Turso connection helpers
-│       │   └── turso_store.py    # Turso data storage
-│       ├── pdf/
-│       │   ├── extractor.py   # PDF extraction logic
-│       │   └── processor.py   # Processing logic
-│       └── viz/
-│           ├── charts.py      # Chart creation
-│           └── dashboard.py   # Dashboard components
-└── tests/
+├── src/clippertv/
+│   ├── app.py              # Main Streamlit app
+│   ├── auth/               # Authentication (JWT, encryption)
+│   ├── data/               # Data models and storage
+│   ├── pdf/                # PDF extraction and processing
+│   ├── viz/                # Charts and dashboard components
+│   └── scheduler/          # Automated PDF ingestion
+├── migrations/             # Database migrations
+├── tests/                  # Test suite
+└── .env                    # Environment configuration
 ```
 
-## Installation
+## Development
 
-1. Clone the repository
-2. Install dependencies with [uv](https://github.com/astral-sh/uv)
-3. Set required secrets in `.streamlit/secrets.toml`
+See [PLAN.md](PLAN.md) for migration roadmap and [CLAUDE.md](CLAUDE.md) for development guidelines.
 
-## Usage
-
-Run the application with:
-
+**Run tests:**
 ```bash
-uv run streamlit run src/clippertv/app.py
+uv run pytest tests/test_auth.py -v
+uv run pytest tests/test_user_store.py -v
 ```
+
+**Environment:** Configured via `.env` file (see `.env.example`)
