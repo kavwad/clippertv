@@ -2,7 +2,8 @@
 
 ## Quick Commands
 ```bash
-# Run app
+# Run app (requires dashboard dependencies)
+uv sync --extra dashboard
 uv run streamlit run src/clippertv/app.py
 
 # Tests
@@ -18,6 +19,19 @@ uv run python migrations/run_migration.py  # Run DB migration
 uv run black src/ tests/
 uv run mypy src/
 ```
+
+## Dependencies
+
+**Core dependencies** (always installed):
+- PDF processing: `camelot-py`, `pdfminer-six`, `pypdf`
+- Database: `libsql` (Turso client)
+- Auth: `pyjwt`, `bcrypt`, `cryptography`, `pydantic[email]`
+- HTTP: `requests`, `bs4`
+
+**Optional dependencies** (`--extra dashboard`):
+- Dashboard UI: `streamlit`, `pandas`, `plotly`, `python-multipart`
+
+The Raspberry Pi scheduler only needs core dependencies (no Streamlit).
 
 ## Architecture
 

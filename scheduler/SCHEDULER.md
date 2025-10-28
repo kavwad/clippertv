@@ -1,89 +1,45 @@
 # Automated Monthly Ingestion
 
-Auto-download and ingest Clipper PDFs monthly on your Raspberry Pi.
+Auto-download and ingest Clipper PDFs monthly on your Raspberry Pi using systemd timer.
 
-## Quick Start
+## Setup on Raspberry Pi
 
-1. **Choose scheduling approach:**
-   - **APScheduler** (simpler): Always-running Python scheduler
-   - **systemd Timer** (efficient): Native Linux timer, runs only when needed
-
-2. **Install dependencies:**
+1. **Clone repo and install dependencies:**
    ```bash
-   cd ~/schedule-ingestion
-   uv sync && uv add apscheduler
+   cd ~
+   git clone https://github.com/kavwad/clippertv.git
+   cd clippertv
+
+   # Install uv if needed
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   source ~/.local/bin/env
+
+   # Install dependencies (core only, no Streamlit)
+   uv sync
    ```
 
-3. **Configure secrets** in `.streamlit/secrets.toml`
+2. **Copy .env file** from your development machine with database credentials
 
-4. **Install service** (see below for your chosen approach)
+3. **Users already set up in database** (Bree and Kaveh with encrypted Clipper credentials)
 
-5. **(Optional)** Set up Healthchecks.io for failure notifications
+4. **Install systemd timer:**
+   ```bash
+   # Update paths in service file if needed (should be /home/kavwad/clippertv)
+   sudo cp scheduler/clippertv-ingestion.{service,timer} /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now clippertv-ingestion.timer
+   ```
 
----
+5. **Verify:**
+   ```bash
+   systemctl list-timers clippertv-ingestion.timer
+   ```
 
-## APScheduler Setup (Simpler)
-
-**Best for:** Simple setup, Python familiarity
-
-### Install
-
-```bash
-# Edit paths if needed
-nano clippertv-scheduler.service
-
-# Install
-sudo cp clippertv-scheduler.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now clippertv-scheduler
-
-# Verify
-sudo systemctl status clippertv-scheduler
-```
-
-### Usage
-
-```bash
-# View status
-sudo systemctl status clippertv-scheduler
-
-# View logs
-sudo journalctl -u clippertv-scheduler -f
-tail -f logs/scheduler.log
-
-# Manual trigger
-uv run python -m clippertv.pdf.downloader --all --last-month --ingest
-```
-
----
-
-## systemd Timer Setup (More Efficient)
-
-**Best for:** Maximum efficiency, native Linux integration
-
-### Install
-
-```bash
-# Edit paths if needed
-nano clippertv-ingestion.service
-
-# Install
-sudo cp clippertv-ingestion.{service,timer} /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now clippertv-ingestion.timer
-
-# Verify
-systemctl list-timers clippertv-ingestion.timer
-```
-
-### Usage
+## Usage
 
 ```bash
 # View next run time
 systemctl list-timers clippertv-ingestion.timer
-
-# View status
-sudo systemctl status clippertv-ingestion.timer
 
 # Manual trigger
 sudo systemctl start clippertv-ingestion.service
@@ -92,129 +48,16 @@ sudo systemctl start clippertv-ingestion.service
 sudo journalctl -u clippertv-ingestion -f
 ```
 
----
+## Scheduled Run
 
-## Healthchecks.io Monitoring (Optional)
+- Runs on the **2nd of each month at 2:00 AM**
+- Downloads last month's PDFs for all users
+- Deduplicates and archives to `pdfs/` directory
+- Ingests transactions to Turso database
 
-Get notified when ingestion fails.
+## Optional: Healthchecks.io Monitoring
 
-1. Sign up at https://healthchecks.io (free)
+1. Sign up at https://healthchecks.io
 2. Create check: 31-day period, 2-hour grace
-3. Copy ping URL
-4. Edit service file:
-   ```bash
-   sudo nano /etc/systemd/system/clippertv-scheduler.service  # or clippertv-ingestion.service
-   ```
-5. Uncomment and set:
-   ```ini
-   Environment="HEALTHCHECK_URL=https://hc-ping.com/your-uuid-here"
-   ```
-6. Reload:
-   ```bash
-   sudo systemctl daemon-reload
-   sudo systemctl restart clippertv-scheduler  # or clippertv-ingestion.timer
-   ```
-
----
-
-## File Structure
-
-```
-clippertv/
-├── src/clippertv/scheduler/
-│   ├── service.py                      # APScheduler entry point (python -m clippertv.scheduler.service)
-│   ├── run_ingestion.py                # systemd timer entry point (python -m clippertv.scheduler.run_ingestion)
-│   └── __init__.py                     # Package exports
-├── scheduler/                          # Deployment artifacts (this folder)
-│   ├── clippertv-scheduler.service     # APScheduler systemd unit
-│   ├── clippertv-ingestion.service     # Timer service unit
-│   ├── clippertv-ingestion.timer       # Timer config
-│   └── SCHEDULER.md                    # This guide
-├── pdf/                               # Archived PDFs (gitignored)
-│   ├── clippertv-transactions-12345-2025-01.pdf
-│   └── ...
-└── logs/scheduler.log                  # Application logs (gitignored)
-```
-
----
-
-## Configuration
-
-Edit `.streamlit/secrets.toml`:
-
-```toml
-[clipper.rider_accounts]
-B = ["card_serial_1", "card_serial_2"]
-K = ["card_serial_3"]
-
-[clipper.users.B]
-email = "user@example.com"
-password = "password"
-
-[clipper.users.K]
-email = "user@example.com"
-password = "password"
-```
-
-Secure it:
-```bash
-chmod 600 .streamlit/secrets.toml
-```
-
----
-
-## Troubleshooting
-
-### Service won't start
-```bash
-sudo journalctl -u clippertv-scheduler -n 50  # Check errors
-sudo systemctl status clippertv-scheduler     # View status
-```
-
-### No PDFs downloaded
-```bash
-tail -f logs/scheduler.log  # Check app logs
-# Verify credentials in .streamlit/secrets.toml
-```
-
-### Timer not triggering
-```bash
-systemctl list-timers  # Check next run
-sudo systemctl status clippertv-ingestion.timer
-```
-
----
-
-## Comparison
-
-| Feature | APScheduler | systemd Timer |
-|---------|-------------|---------------|
-| Setup | ⭐ Easy | ⭐⭐ Medium |
-| Resources | Higher (always running) | Lower (on-demand) |
-| Files | 1 service | 2 files (service + timer) |
-
-**Both support:**
-- Healthchecks.io monitoring
-- Auto-restart on failure
-- PDF deduplication
-- Comprehensive logging
-
----
-
-## FAQ
-
-**Q: Which should I use?**
-A: APScheduler is simpler. systemd timer is more efficient. Both work great!
-
-**Q: What if Pi is offline during scheduled time?**
-A: APScheduler has 1-hour grace. Timer has `Persistent=true` to catch up.
-
-**Q: How much disk space?**
-A: ~50-200 KB per PDF. ~5-10 MB/year for 2 riders.
-
-**Q: How do I know if it fails?**
-A: Set up Healthchecks.io for automatic email/SMS/Slack alerts.
-
----
-
-**Need help?** Check logs first: `sudo journalctl -u <service-name> -n 100`
+3. Edit service file and uncomment HEALTHCHECK_URL line with your ping URL
+4. Reload: `sudo systemctl daemon-reload && sudo systemctl restart clippertv-ingestion.timer`

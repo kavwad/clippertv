@@ -5,13 +5,19 @@ requires-python = ">=3.13"
 dependencies = [
     "bs4>=0.0.2",
     "camelot-py>=1.0.0",
-    "pandas>=2.2.0",
-    "plotly>=6.0.0",
-    "pydantic>=2.6.0",
+    "pydantic[email]>=2.6.0",
     "requests>=2.32.0",
     "libsql>=0.1.11",
+    "pyjwt>=2.10.1",
+    "bcrypt>=5.0.0",
+    "cryptography>=46.0.3",
+    "plotly>=6.3.1",
+    "python-multipart>=0.0.20",
+]
+
+[project.optional-dependencies]
+dashboard = [
     "streamlit>=1.50.0",
-    "apscheduler>=3.11.0",
 ]
 
 [project.scripts]

@@ -68,15 +68,20 @@ class AppConfig(BaseModel):
 
     def _setup_column_config(self) -> None:
         """Initialize column configuration for Streamlit data displays."""
-        import streamlit as st
+        try:
+            import streamlit as st
 
-        self.column_config = {
-            'Year': st.column_config.NumberColumn(format="%d", width=75),
-            'Month': st.column_config.DateColumn(format="MMM YYYY", width=75),
-        }
+            self.column_config = {
+                'Year': st.column_config.NumberColumn(format="%d", width=75),
+                'Month': st.column_config.DateColumn(format="MMM YYYY", width=75),
+            }
 
-        for category in self.transit_categories.display_categories:
-            self.column_config[category] = st.column_config.NumberColumn(format="$%d")
+            for category in self.transit_categories.display_categories:
+                self.column_config[category] = st.column_config.NumberColumn(format="$%d")
+        except ImportError:
+            # Streamlit not available (e.g., in scheduler environment)
+            # column_config will remain empty dict
+            pass
 
 
 config = AppConfig()
