@@ -10,7 +10,11 @@ import pandas as pd
 
 from clippertv.config import config
 from clippertv.data.models import RiderData, TransitTransaction
-from clippertv.data.turso_client import get_turso_client, initialize_database
+from clippertv.data.turso_client import (
+    get_turso_client,
+    initialize_database,
+    reset_turso_client,
+)
 
 
 class TursoStore:
@@ -43,10 +47,36 @@ class TursoStore:
         # Get transit mode mappings
         self._transit_ids = self._get_transit_mode_ids()
 
+    def _reset_connection(self) -> None:
+        """Reset the Turso connection if the stream is stale."""
+        reset_turso_client()
+        self.conn = get_turso_client()
+
+    def _execute(self, *args, **kwargs):
+        """Execute a query with automatic stream-not-found recovery."""
+        try:
+            return self.conn.execute(*args, **kwargs)
+        except ValueError as exc:
+            if "stream not found" in str(exc).lower():
+                self._reset_connection()
+                return self.conn.execute(*args, **kwargs)
+            raise
+
+    def _commit(self) -> None:
+        """Commit with stream-not-found recovery."""
+        try:
+            self.conn.commit()
+        except ValueError as exc:
+            if "stream not found" in str(exc).lower():
+                self._reset_connection()
+                self.conn.commit()
+                return
+            raise
+
     @lru_cache(maxsize=1)
     def _get_transit_mode_ids(self) -> Dict[str, int]:
         """Get mapping of transit mode names to IDs."""
-        result = self.conn.execute("SELECT id, name FROM transit_modes")
+        result = self._execute("SELECT id, name FROM transit_modes")
         rows = result.fetchall()
         return {row[1]: row[0] for row in rows}  # name -> id
 
@@ -85,18 +115,18 @@ class TursoStore:
 
     def _ensure_rider_exists(self, rider_id: str) -> None:
         """Ensure the rider exists in the database, create if not."""
-        result = self.conn.execute(
+        result = self._execute(
             "SELECT * FROM riders WHERE id = ?",
             [rider_id]
         )
 
         if not result.fetchone():
             # Rider doesn't exist, create it
-            self.conn.execute(
+            self._execute(
                 "INSERT INTO riders (id, name, email) VALUES (?, NULL, NULL)",
                 [rider_id]
             )
-            self.conn.commit()
+            self._commit()
 
     def load_data(self, rider_id: str, user_id: Optional[str] = None) -> pd.DataFrame:
         """
@@ -113,7 +143,7 @@ class TursoStore:
 
     def _fetch_cache_token(self, rider_id: str) -> Tuple[str, str, int]:
         """Return a token describing the current DB state for a rider."""
-        result = self.conn.execute(
+        result = self._execute(
             """
             SELECT
                 COALESCE(MAX(updated_at), ''),
@@ -190,7 +220,7 @@ class TursoStore:
                 ORDER BY t.rider_id, t.transaction_date DESC
             """
 
-            result = self.conn.execute(query, query_params)
+            result = self._execute(query, query_params)
             rows = result.fetchall()
 
             grouped: Dict[str, List[Dict[str, Any]]] = {r: [] for r in missing}
@@ -334,7 +364,7 @@ class TursoStore:
             trip_id = existing_trips.get(key)
 
             if trip_id:
-                self.conn.execute("""
+                self._execute("""
                     UPDATE trips
                     SET transit_id = ?, location = ?, route = ?,
                         debit = ?, credit = ?, balance = ?, product = ?,
@@ -343,7 +373,7 @@ class TursoStore:
                 """, [transit_id, location, route, debit, credit, balance,
                       product, row_hash, user_id, trip_id])
             else:
-                cursor = self.conn.execute("""
+                cursor = self._execute("""
                     INSERT INTO trips (
                         rider_id, transit_id, transaction_type, transaction_date,
                         location, route, debit, credit, balance, product, content_hash, user_id
@@ -354,7 +384,7 @@ class TursoStore:
                     existing_trips[key] = cursor.lastrowid
 
         print(f"    Committing changes to database...", file=sys.stderr)
-        self.conn.commit()
+        self._commit()
         print(f"    Committed successfully!", file=sys.stderr)
 
         self._cache[rider_id] = cache_df
@@ -394,7 +424,7 @@ class TursoStore:
 
         Returns a dict mapping (transaction_date, transaction_type, location, debit, credit) -> id
         """
-        result = self.conn.execute("""
+        result = self._execute("""
             SELECT id, transaction_date, transaction_type, location, debit, credit
             FROM trips
             WHERE rider_id = ?
@@ -410,7 +440,7 @@ class TursoStore:
 
     def _get_existing_hashes(self, rider_id: str) -> Dict[str, int]:
         """Return mapping of content hashes to trip IDs for a rider."""
-        result = self.conn.execute(
+        result = self._execute(
             """
             SELECT content_hash, id
             FROM trips

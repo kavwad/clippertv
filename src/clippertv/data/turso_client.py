@@ -77,6 +77,18 @@ def get_turso_client():
     return _cached_conn
 
 
+def reset_turso_client() -> None:
+    """Reset the cached Turso client (for broken streams)."""
+    global _cached_conn
+    with _conn_lock:
+        if _cached_conn is not None:
+            try:
+                _cached_conn.close()
+            except Exception:
+                pass
+            _cached_conn = None
+
+
 def initialize_database(force: bool = False) -> None:
     """Initialize Turso database with required tables.
 
