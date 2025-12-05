@@ -78,6 +78,37 @@ def _rule(
 
 
 CATEGORIZATION_RULES: tuple[CategorizationRule, ...] = (
+    # Ferry rules with location-based matching (higher precedence than Caltrain)
+    # Matches SF Bay Ferry terminals and Golden Gate Ferry locations
+    # Excludes "Bay Crossings" which is for reloads, not ferry rides
+    _rule(
+        category="Ferry Entrance",
+        precedence=105,
+        conditions=(
+            {
+                "column": "Transaction Type",
+                "regex": r"Dual-tag entry transaction.*purse debit",
+            },
+            {
+                "column": "Location",
+                "regex": r"Ferry Building/|^Oakland$|^Richmond$|Alameda.*Main|Alameda.*Seaplane|^Mare Island$|^Vallejo$|Seaplane|Harbor Bay|Pier 41|Treasure Island|South San Francisco.*Ferry|\(GGF\)",
+            },
+        ),
+    ),
+    _rule(
+        category="Ferry Exit",
+        precedence=105,
+        conditions=(
+            {
+                "column": "Transaction Type",
+                "regex": r"Dual-tag exit transaction.*fare adjustment",
+            },
+            {
+                "column": "Location",
+                "regex": r"Ferry Building/|^Oakland$|^Richmond$|Alameda.*Main|Alameda.*Seaplane|^Mare Island$|^Vallejo$|Seaplane|Harbor Bay|Pier 41|Treasure Island|South San Francisco.*Ferry|\(GGF\)",
+            },
+        ),
+    ),
     _rule(
         category="Caltrain Entrance",
         precedence=100,
@@ -98,35 +129,6 @@ CATEGORIZATION_RULES: tuple[CategorizationRule, ...] = (
                 "regex": r"Dual-tag exit transaction.*fare adjustment",
             },
             {"column": "Route", "isna": True},
-        ),
-    ),
-    _rule(
-        category="Ferry Entrance",
-        precedence=90,
-        conditions=(
-            {
-                "column": "Transaction Type",
-                "regex": r"Dual-tag entry transaction.*purse debit",
-            },
-            {"column": "Route", "equals": "FERRY"},
-        ),
-    ),
-    _rule(
-        category="Ferry Entrance",
-        precedence=85,
-        conditions=(
-            {"column": "Location", "endswith": "(GGF)"},
-        ),
-    ),
-    _rule(
-        category="Ferry Exit",
-        precedence=80,
-        conditions=(
-            {
-                "column": "Transaction Type",
-                "regex": r"Dual-tag exit transaction.*fare adjustment",
-            },
-            {"column": "Route", "equals": "FERRY"},
         ),
     ),
     _rule(
