@@ -273,8 +273,13 @@ class TursoStore:
         - BART + entry -> "BART Entrance"
         - BART + exit -> "BART Exit"
         - Muni Bus + entry -> "Muni Bus"
+        - reload -> "Reload"
         - etc.
         """
+        # Handle reload transactions (card reloads, pass purchases)
+        if transaction_type == 'reload':
+            return 'Reload'
+
         if not transit_mode:
             return 'Unknown'
 
@@ -397,6 +402,7 @@ class TursoStore:
         - "BART Entrance" -> (BART_id, "entry")
         - "BART Exit" -> (BART_id, "exit")
         - "Muni Bus" -> (Muni_Bus_id, "entry")
+        - "Reload" -> (None, "reload")
         - etc.
 
         Returns:
@@ -404,6 +410,10 @@ class TursoStore:
         """
         if not category or pd.isna(category):
             return (None, None)
+
+        # Handle Reload category (card reloads, pass purchases)
+        if category == 'Reload':
+            return (None, 'reload')
 
         # Check for entrance/exit suffixes
         if category.endswith(' Entrance'):

@@ -12,6 +12,62 @@ from .charts import (
 )
 
 
+def _attribute_pass_costs_to_first_use(df):
+    """Attribute pass purchase costs to the month of first pass-covered ride.
+
+    Finds pass purchases and attributes their cost to the month when the pass
+    was first used (first exit covered by the pass). If no pass-covered rides
+    exist, attributes to the purchase month.
+
+    Returns:
+        DataFrame with columns [Transaction Date, Pass Cost] where Transaction Date
+        is set to the first pass-covered ride's date (or purchase date if no rides)
+    """
+    # Find pass purchases (any Caltrain pass product)
+    pass_purchases = df[
+        (df['Category'] == 'Reload') &
+        (df['Product'].str.contains('Caltrain', na=False)) &
+        (df['Product'].str.contains('Pass', na=False)) &
+        (df['Credit'] > 100)
+    ].copy()
+
+    if pass_purchases.empty:
+        return pd.DataFrame(columns=['Transaction Date', 'Pass Cost'])
+
+    # Find pass-covered rides (any Caltrain pass product)
+    pass_rides = df[
+        (df['Product'].str.contains('Caltrain', na=False)) &
+        (df['Product'].str.contains('Pass', na=False)) &
+        (df['Category'].str.contains('Caltrain', na=False)) &
+        (df['Transaction Type'] == 'exit')
+    ].copy()
+
+    attributed_costs = []
+
+    for _, purchase in pass_purchases.iterrows():
+        purchase_date = purchase['Transaction Date']
+        pass_cost = purchase['Credit']
+
+        # Find first pass-covered ride after purchase
+        subsequent_rides = pass_rides[pass_rides['Transaction Date'] >= purchase_date]
+
+        if not subsequent_rides.empty:
+            # Use the date of the first pass-covered ride
+            first_ride_date = subsequent_rides['Transaction Date'].min()
+            attributed_costs.append({
+                'Transaction Date': first_ride_date,
+                'Pass Cost': pass_cost
+            })
+        else:
+            # No pass-covered rides found, use purchase date
+            attributed_costs.append({
+                'Transaction Date': purchase_date,
+                'Pass Cost': pass_cost
+            })
+
+    return pd.DataFrame(attributed_costs)
+
+
 def create_pivot_year(df):
     """Create yearly pivot table of trips by category."""
     pivot_year = (df.pivot_table(
@@ -70,21 +126,20 @@ def create_pivot_year_cost(df):
         fill_value=0
     ))
 
-    if 'Caltrain Adult 3 Zone Monthly Pass' in df['Product'].unique():
-        # Calculate annual cost for Caltrain monthly pass
-        caltrain_pass_yearly = df.pivot_table(
-            index=df['Transaction Date'].dt.year,
-            columns='Product',
-            values='Debit',
-            aggfunc='sum',
-            fill_value=0
-        )[['Caltrain Adult 3 Zone Monthly Pass']]
+    # Attribute pass costs to month of first use
+    pass_costs_attributed = _attribute_pass_costs_to_first_use(df)
 
-        caltrain_pass_yearly.columns = pd.MultiIndex.from_tuples([('Debit', 'Caltrain Pass')])
+    if not pass_costs_attributed.empty:
+        # Group attributed pass costs by year
+        caltrain_pass_yearly = (pass_costs_attributed
+                                .groupby(pass_costs_attributed['Transaction Date'].dt.year)['Pass Cost']
+                                .sum()
+                                .to_frame(('Debit', 'Caltrain Pass'))
+                                )
 
         # Add Caltrain pass cost to pivot table
         pivot_year_cost = pivot_year_cost.join(
-            caltrain_pass_yearly, on='Transaction Date'
+            caltrain_pass_yearly
         ).fillna(0)
 
         # Calculate net values for Caltrain
@@ -132,18 +187,20 @@ def create_pivot_month_cost(df):
                         .unstack(fill_value=0)
                         )
 
-    if 'Caltrain Adult 3 Zone Monthly Pass' in df['Product'].unique():
-        # Calculate monthly cost for Caltrain pass
-        caltrain_pass_monthly = (df[(df['Product'] == 'Caltrain Adult 3 Zone Monthly Pass')
-                                 & (df['Category'].str.contains('Reload'))]
-                                 .groupby(pd.Grouper(key='Transaction Date', freq='ME'))['Credit']
+    # Attribute pass costs to month of first use
+    pass_costs_attributed = _attribute_pass_costs_to_first_use(df)
+
+    if not pass_costs_attributed.empty:
+        # Group attributed pass costs by month
+        caltrain_pass_monthly = (pass_costs_attributed
+                                 .groupby(pd.Grouper(key='Transaction Date', freq='ME'))['Pass Cost']
                                  .sum()
                                  .to_frame(('Debit', 'Caltrain Pass'))
                                  )
 
         # Add Caltrain pass cost to pivot table
         pivot_month_cost = pivot_month_cost.join(
-            caltrain_pass_monthly, on='Transaction Date'
+            caltrain_pass_monthly
         ).fillna(0)
 
         # Calculate net values for Caltrain
