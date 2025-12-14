@@ -1,37 +1,32 @@
 #!/usr/bin/env python3
 """
-Clipper PDF Downloader: download PDF transaction reports for one or more users via ClipperWeb.
+Clipper CSV Downloader: Download CSV transaction reports from clippercard.com.
 """
 import argparse
+import csv
 import os
-import re
 import sys
-from collections import defaultdict
 from datetime import datetime, date, timedelta
-from pathlib import Path
-from typing import Any, Optional, Tuple
+from io import StringIO
 
 import requests
 from bs4 import BeautifulSoup
 import tomllib
 
-from clippertv.pdf.processor import process_pdf_statements
-
 HOST = "https://www.clippercard.com"
-USER_AGENT = "clipper-pdf-downloader/0.1"
-_CARD_SERIAL_PATTERN = re.compile(r"clipper[-_]?transactions[-_]?(\d+)", re.IGNORECASE)
+USER_AGENT = "clipper-downloader/0.2"
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Download PDF transaction reports from ClipperWeb."
+        description="Download CSV transaction reports from clippercard.com."
     )
     parser.add_argument("--email", help="Login email (optional if using --user or --all)")
     parser.add_argument("--password", help="Password (optional if using --user or --all)")
     parser.add_argument(
         "--output",
-        default="pdfs",
-        help="Output directory for PDF files",
+        default="downloads",
+        help="Output directory for CSV files",
     )
     parser.add_argument(
         "--start",
@@ -53,7 +48,7 @@ def parse_args():
     )
     parser.add_argument(
         "--dry-run", action="store_true", dest="dry_run",
-        help="Test run without downloading PDFs (avoids API limits)"
+        help="Test run without downloading (validates login only)"
     )
     parser.add_argument(
         "--user", default="", help="Username from config file (e.g., --user=kaveh)"
@@ -71,7 +66,7 @@ def parse_args():
         "--ingest",
         action="store_true",
         dest="ingest",
-        help="After downloading PDFs, process and load transactions into the data store",
+        help="After downloading, process and load transactions into the data store",
     )
     return parser.parse_args()
 
@@ -90,42 +85,38 @@ def find_csrf_token(html_text):
 
 
 def login(session, email, password):
+    """Login to clippercard.com using the new /web-login flow."""
+    # 1. GET /web-login and extract _csrf
     resp = session.get(
-        f"{HOST}/ClipperWeb/login.html",
+        f"{HOST}/web-login",
         headers={"User-Agent": USER_AGENT},
     )
     if resp.status_code != 200:
         raise RuntimeError(f"Could not get login page: {resp.status_code}")
     csrf = find_csrf_token(resp.text)
-    data = {"_csrf": csrf, "email": email, "password": password}
+
+    # 2. POST /dashboard with form data
+    data = {
+        "_csrf": csrf,
+        "username": email,
+        "password": password,
+        "authFailCount": "0",
+        "postLoginUrl": "",
+    }
     resp2 = session.post(
-        f"{HOST}/ClipperWeb/account",
+        f"{HOST}/dashboard",
         data=data,
         headers={
             "User-Agent": USER_AGENT,
-            "Referer": f"{HOST}/ClipperWeb/login.html",
+            "Referer": f"{HOST}/web-login",
         },
     )
     if resp2.status_code not in (200, 302):
         raise RuntimeError(f"Could not login: {resp2.status_code}")
+
+    # 3. Extract new CSRF token from dashboard response for API calls
+    session.csrf_token = find_csrf_token(resp2.text)
     return session
-
-
-def get_cards(session):
-    resp = session.get(
-        f"{HOST}/ClipperWeb/account.html",
-        headers={"User-Agent": USER_AGENT},
-    )
-    if resp.status_code != 200:
-        raise RuntimeError(f"Could not get account page: {resp.status_code}")
-    soup = BeautifulSoup(resp.text, "html.parser")
-    cards = []
-    for span in soup.find_all("span", class_="d-inline-block"):
-        text = span.get_text(strip=True)
-        parts = text.split(" - ", 1)
-        if len(parts) == 2 and parts[0].isdigit():
-            cards.append({"serial": parts[0], "nickname": parts[1]})
-    return cards
 
 
 def format_clip_date(date_str):
@@ -135,206 +126,90 @@ def format_clip_date(date_str):
     return f"{dt.strftime('%B')} {dt.day}, {dt.year}"
 
 
-def download_pdfs(session, output_dir, start_date, end_date, dry_run):
-    clip_start = format_clip_date(start_date)
-    clip_end = format_clip_date(end_date)
-    resp = session.get(
-        f"{HOST}/ClipperWeb/account.html",
-        headers={"User-Agent": USER_AGENT},
-    )
-    if resp.status_code != 200:
-        raise RuntimeError(f"Could not refresh account page: {resp.status_code}")
-    csrf = find_csrf_token(resp.text)
-    cards = get_cards(session)
-    saved_files = []
-    for card in cards:
-        if dry_run:
-            print(
-                f"[DRY RUN] Would download PDF for card {card['serial']} ({card['nickname']}) "
-                f"with date range: {start_date or 'default'} to {end_date or 'default'}"
-            )
-            continue
-        data = {
-            "_csrf": csrf,
-            "cardNumber": card['serial'],
-            "cardNickName": card['nickname'],
-            "rhStartDate": clip_start,
-            "startDateValue": clip_start,
-            "startDate": clip_start,
-            "rhEndDate": clip_end,
-            "endDateValue": clip_end,
-            "endDate": clip_end,
-        }
-        headers = {
-            "User-Agent": USER_AGENT,
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept": "application/pdf",
-            "Referer": f"{HOST}/ClipperWeb/account.html",
-        }
-        resp2 = session.post(
-            f"{HOST}/ClipperWeb/view/transactionHistory.pdf",
-            data=data,
-            headers=headers,
-        )
-        if resp2.status_code != 200:
-            raise RuntimeError(f"Bad status for card {card['serial']}: {resp2.status_code}")
-        ctype = resp2.headers.get("Content-Type", "")
-        content = resp2.content
-        if not content:
-            print(
-                f"No PDF returned for card {card['serial']} ({card['nickname']}); skipping."
-            )
-            continue
-        if not ctype.startswith("application/pdf"):
-            if content.startswith(b"%PDF"):
-                print(
-                    f"Warning: Unexpected content type '{ctype}' for card {card['serial']}; "
-                    "continuing because response appears to be a PDF."
-                )
-            else:
-                raise RuntimeError(
-                    f"Bad content type for card {card['serial']}: {ctype}"
-                )
-        if not content or not content.lstrip().startswith(b"%PDF"):
-            raise RuntimeError(
-                f"Invalid PDF content for card {card['serial']}: missing PDF header"
-            )
-
-        os.makedirs(output_dir, exist_ok=True)
-        filename = os.path.join(
-            output_dir, f"clipper-transactions-{card['serial']}.pdf"
-        )
-        with open(filename, "wb") as f:
-            f.write(content)
-        print(f"Saved PDF: {filename} (Card: {card['nickname']})")
-        saved_files.append({"path": filename, "card": card})
-
-    return saved_files
-
-
-def _extract_serial_from_filename(path: str) -> Optional[str]:
-    """Infer a Clipper card serial from a saved PDF filename."""
-    stem = Path(path).stem
-    match = _CARD_SERIAL_PATTERN.search(stem)
-    if match:
-        return match.group(1)
-    return None
-
-
-def _normalize_saved_file_entry(entry: Any) -> Tuple[str, Optional[str]]:
-    """
-    Normalize saved file metadata produced by downloader or scheduler.
-
-    Returns:
-        Tuple of (path, serial) where serial may be None if unavailable.
-    """
-    path: Optional[str] = None
-    serial: Optional[str] = None
-
-    if isinstance(entry, (str, os.PathLike)):
-        path = str(entry)
-    elif isinstance(entry, dict):
-        raw_path = (
-            entry.get("path")
-            or entry.get("file")
-            or entry.get("filepath")
-            or entry.get("filename")
-        )
-        if raw_path:
-            path = str(raw_path)
-
-        card_info = entry.get("card")
-        if isinstance(card_info, dict):
-            serial_candidate = (
-                card_info.get("serial")
-                or card_info.get("card_number")
-                or card_info.get("card")
-            )
-            if serial_candidate:
-                serial = str(serial_candidate)
-        elif isinstance(card_info, (str, int)):
-            serial = str(card_info)
-        elif card_info is not None:
-            serial = str(card_info)
-
-        if not serial:
-            serial_candidate = (
-                entry.get("serial")
-                or entry.get("card_serial")
-                or entry.get("card_number")
-            )
-            if serial_candidate:
-                serial = str(serial_candidate)
+def download_csv(session, start_date, end_date, dry_run=False):
+    """Download transaction history as CSV from the new API."""
+    # Format date range as "Month Day, Year - Month Day, Year"
+    if start_date and end_date:
+        filter_period = f"{format_clip_date(start_date)} - {format_clip_date(end_date)}"
     else:
-        path = str(entry)
+        filter_period = "Past 30 Days"
 
-    if path and not serial:
-        serial = _extract_serial_from_filename(path)
+    if dry_run:
+        print(f"[DRY RUN] Would download CSV with filter: {filter_period}")
+        return None
 
-    if not path:
-        raise ValueError(f"Saved file entry is missing a path: {entry}")
+    # Use CSRF token from login
+    csrf_token = getattr(session, "csrf_token", None)
+    if not csrf_token:
+        raise RuntimeError("No CSRF token available - login may have failed")
 
-    if serial:
-        serial = serial.strip() or None
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Content-Type": "application/json;charset=UTF-8",
+        "Accept": "*/*",
+        "X-CSRF-TOKEN": csrf_token,
+        "Referer": f"{HOST}/tripHistory",
+        "Origin": HOST,
+    }
 
-    return path, serial
+    payload = {
+        "filterPeriod": filter_period,
+        "filterTA": "All Clipper Cards",
+    }
 
+    resp = session.post(
+        f"{HOST}/download-trip-history/CSV",
+        json=payload,
+        headers=headers,
+    )
 
-def group_pdfs_by_rider(saved_files, rider_accounts):
-    """Group downloaded PDFs by rider identifier based on account mapping."""
-    files_by_rider = defaultdict(list)
-    unmatched = []
-
-    for entry in saved_files:
-        try:
-            path, card_serial = _normalize_saved_file_entry(entry)
-        except ValueError:
-            unmatched.append("<unknown>")
-            continue
-
-        rider = None
-        for rider_id, accounts in rider_accounts.items():
-            if card_serial in {str(acc) for acc in accounts}:
-                rider = rider_id
-                break
-
-        if rider:
-            files_by_rider[rider].append(path)
-        else:
-            unmatched.append(card_serial or Path(path).name)
-
-    return files_by_rider, unmatched
-
-
-def process_downloaded_pdfs(saved_files, rider_accounts):
-    """Process downloaded PDFs and load transactions into the data store."""
-    if not saved_files:
-        return
-
-    if not rider_accounts:
+    if resp.status_code == 404:
+        # Known server-side issue - endpoint not yet available
         raise RuntimeError(
-            "Cannot process PDFs without rider account mapping in config (rider_accounts section)."
+            f"CSV download endpoint returned 404. This is a known Clipper server issue. "
+            f"Response: {resp.text[:200]}"
+        )
+    if resp.status_code != 200:
+        raise RuntimeError(f"CSV download failed: {resp.status_code} - {resp.text[:200]}")
+
+    if not resp.text:
+        # Server returns 200 but empty content - another server-side issue
+        raise RuntimeError(
+            "CSV download returned empty content. This appears to be a Clipper server issue. "
+            "The endpoint exists but is not returning data."
         )
 
-    files_by_rider, unmatched = group_pdfs_by_rider(saved_files, rider_accounts)
+    return resp.text  # CSV content as string
 
-    if unmatched:
-        print(
-            f"Warning: No rider mapping found for card(s): {', '.join(unmatched)} "
-            "- skipping these PDFs."
-        )
 
-    if not files_by_rider:
-        print("No PDFs matched configured rider accounts; nothing to process.")
-        return
+def parse_csv_transactions(csv_content: str) -> list[dict]:
+    """Parse CSV content into transaction records."""
+    if not csv_content:
+        return []
+    if csv_content.strip().startswith("{"):  # JSON error response
+        raise RuntimeError(f"Invalid CSV response (got JSON): {csv_content[:200]}")
 
-    for rider_id, pdf_paths in files_by_rider.items():
-        print(f"Processing {len(pdf_paths)} PDF(s) for rider {rider_id}...")
-        result = process_pdf_statements(pdf_paths, rider_id)
-        if result is None or result.empty:
-            print(f" - No transactions extracted for rider {rider_id}.")
-        else:
-            print(f" - Processed {len(result)} transactions for rider {rider_id}.")
+    reader = csv.DictReader(StringIO(csv_content))
+    return list(reader)
+
+
+def download_transactions(session, output_dir, start_date, end_date, dry_run):
+    """Download transactions as CSV and save to file."""
+    csv_content = download_csv(session, start_date, end_date, dry_run)
+
+    if dry_run or not csv_content:
+        return []
+
+    # Save CSV file
+    os.makedirs(output_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = os.path.join(output_dir, f"clipper-transactions-{timestamp}.csv")
+
+    with open(filename, "w") as f:
+        f.write(csv_content)
+
+    print(f"Saved CSV: {filename}")
+    return [{"path": filename, "content": csv_content}]
 
 
 def main():
@@ -393,46 +268,33 @@ def main():
         print(f"Using last month date range: {start_date} to {end_date}")
 
     if args.dry_run:
-        print("[DRY RUN] Testing PDF download parameters...")
+        print("[DRY RUN] Testing login and CSV download parameters...")
     else:
-        print("Downloading PDF transaction reports...")
+        print("Downloading CSV transaction reports...")
 
-    all_saved_files = []
-
-    for idx, (uname, email, pw) in enumerate(users):
+    for uname, email, pw in users:
         if len(users) > 1:
             print(f"\n=== Processing user: {uname} ({email}) ===")
         session = requests.Session()
         session.headers.update({"User-Agent": USER_AGENT})
         try:
             login(session, email, pw)
-            saved_files = download_pdfs(session, args.output, start_date, end_date, args.dry_run)
-            all_saved_files.extend(saved_files)
+            download_transactions(session, args.output, start_date, end_date, args.dry_run)
         except Exception as e:
             sys.stderr.write(f"Error for user {uname}: {e}\n")
             return 1
 
     if args.ingest and not args.dry_run:
-        if not config_data:
-            try:
-                config_data = load_config(args.config_file)
-            except Exception as e:
-                sys.stderr.write(
-                    f"Error loading config file {args.config_file} for processing: {e}\n"
-                )
-                return 1
-        clipper_cfg = config_data.get("clipper", {})
-        rider_accounts = clipper_cfg.get("rider_accounts", {})
-        try:
-            process_downloaded_pdfs(all_saved_files, rider_accounts)
-        except Exception as e:
-            sys.stderr.write(f"Post-processing failed: {e}\n")
-            return 1
+        # TODO: CSV ingestion not yet implemented - processor.py expects PDFs
+        print(
+            "Warning: --ingest is not yet supported for CSV downloads. "
+            "The CSV file has been saved but not processed into the database."
+        )
 
     if args.dry_run:
         print("\n[DRY RUN] Test completed successfully.")
     else:
-        print(f"\nPDF downloads completed for {len(users)} user(s). Files saved to: {args.output}")
+        print(f"\nCSV downloads completed for {len(users)} user(s). Files saved to: {args.output}")
     return 0
 
 
