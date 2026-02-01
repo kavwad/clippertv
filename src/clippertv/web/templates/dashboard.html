@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="rider-selector">
+    {% for r in riders %}
+    <a href="/?rider={{ r }}" class="rider-btn {% if r == rider %}active{% endif %}">{{ r }}</a>
+    {% endfor %}
+</div>
+
+<h1>Welcome to Clipper TV!</h1>
+
+<div class="stats">
+    <p>
+        <strong>{{ rider }}</strong> took <span class="highlight">{{ stats.trips_this_month }}</span> trips in
+        {{ stats.most_recent_date.strftime('%B') }}, which cost
+        <span class="highlight">${{ stats.cost_this_month }}</span>.
+    </p>
+    <p>
+        {{ rider }} rode <strong>{{ stats.most_used_mode }}</strong> most, at
+        <strong>{{ pivot_month.iloc[0][stats.most_used_mode] }}</strong> times.
+        Altogether, {{ rider }} took {{ stats.trip_diff|abs }} {{ stats.trip_diff_text }}
+        trips and paid ${{ stats.cost_diff|abs }} {{ stats.cost_diff_text }}
+        than the previous month.
+    </p>
+    {% if stats.pass_upshot is not none %}
+        {% if stats.pass_upshot < 0 %}
+        <p>This month, {{ rider }} saved <strong>${{ -stats.pass_upshot }}</strong> with a Caltrain pass.</p>
+        {% elif stats.pass_upshot > 0 %}
+        <p>This month, {{ rider }} spent an extra <strong>${{ stats.pass_upshot }}</strong> by getting a Caltrain pass (!!).</p>
+        {% else %}
+        <p>This month, {{ rider }} broke even with a Caltrain pass.</p>
+        {% endif %}
+    {% endif %}
+    {% if stats.most_recent_date.strftime('%B') != 'January' %}
+    <p>
+        This year, {{ rider }} has taken <strong>{{ pivot_year.iloc[0].sum() }}</strong> trips,
+        costing <strong>${{ pivot_year_cost.iloc[0].sum()|round|int }}</strong>.
+    </p>
+    {% endif %}
+</div>
+
+<div class="chart-container">
+    <canvas id="tripChart"></canvas>
+</div>
+
+<div class="chart-container">
+    <canvas id="costChart"></canvas>
+</div>
+
+<div class="tab-group" id="dataTabs">
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="annual">Annual stats</button>
+        <button class="tab-btn" data-tab="monthly">Monthly stats</button>
+        <button class="tab-btn" data-tab="comparison">Comparison</button>
+    </div>
+
+    <div class="tab-content active" id="annual">
+        <h3 style="margin-bottom: 0.5rem; color: var(--text-muted);">Annual trips by mode</h3>
+        <div class="table-container" id="yearlyTripsTable"></div>
+
+        <h3 style="margin: 1rem 0 0.5rem; color: var(--text-muted);">Annual cost by mode</h3>
+        <div class="table-container" id="yearlyCostsTable"></div>
+    </div>
+
+    <div class="tab-content" id="monthly">
+        <h3 style="margin-bottom: 0.5rem; color: var(--text-muted);">Monthly trips by mode</h3>
+        <div class="table-container" id="monthlyTripsTable"></div>
+
+        <h3 style="margin: 1rem 0 0.5rem; color: var(--text-muted);">Monthly cost by mode</h3>
+        <div class="table-container" id="monthlyCostsTable"></div>
+    </div>
+
+    <div class="tab-content" id="comparison">
+        <div class="chart-container">
+            <canvas id="comparisonChart"></canvas>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const rider = '{{ rider }}';
+
+    // Chart.js default config for dark theme
+    Chart.defaults.color = '#a0a0a0';
+    Chart.defaults.borderColor = '#2d3139';
+
+    // Responsive chart options
+    const chartOptions = {
+        responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: window.innerWidth < 640 ? 1.2 : 2,
+        interaction: {
+            mode: 'index',
+            intersect: false,
+        },
+        plugins: {
+            legend: {
+                position: window.innerWidth < 640 ? 'bottom' : 'top',
+                labels: {
+                    boxWidth: 12,
+                    padding: 8,
+                }
+            },
+            tooltip: {
+                callbacks: {}
+            }
+        },
+        scales: {
+            x: {
+                stacked: true,
+                ticks: {
+                    maxRotation: 45,
+                    minRotation: 45,
+                }
+            },
+            y: {
+                stacked: true,
+                beginAtZero: true,
+            }
+        }
+    };
+
+    // Load trip chart
+    fetch(`/api/trips/${rider}`)
+        .then(r => r.json())
+        .then(data => {
+            new Chart(document.getElementById('tripChart'), {
+                type: 'bar',
+                data: data,
+                options: {
+                    ...chartOptions,
+                    plugins: {
+                        ...chartOptions.plugins,
+                        title: {
+                            display: true,
+                            text: 'Monthly trips',
+                            align: 'start',
+                            font: { size: 16, weight: 'normal' }
+                        }
+                    }
+                }
+            });
+        });
+
+    // Load cost chart
+    fetch(`/api/costs/${rider}`)
+        .then(r => r.json())
+        .then(data => {
+            new Chart(document.getElementById('costChart'), {
+                type: 'bar',
+                data: data,
+                options: {
+                    ...chartOptions,
+                    plugins: {
+                        ...chartOptions.plugins,
+                        title: {
+                            display: true,
+                            text: 'Monthly transit cost',
+                            align: 'start',
+                            font: { size: 16, weight: 'normal' }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => `${ctx.dataset.label}: $${ctx.raw.toFixed(2)}`
+                            }
+                        }
+                    },
+                    scales: {
+                        ...chartOptions.scales,
+                        y: {
+                            ...chartOptions.scales.y,
+                            ticks: {
+                                callback: val => `$${val}`
+                            }
+                        }
+                    }
+                }
+            });
+        });
+
+    // Load comparison chart (for the tab)
+    fetch('/api/comparison')
+        .then(r => r.json())
+        .then(data => {
+            new Chart(document.getElementById('comparisonChart'), {
+                type: 'line',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: window.innerWidth < 640 ? 1.2 : 2,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Trips per month',
+                            align: 'start',
+                            font: { size: 16, weight: 'normal' }
+                        },
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45,
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                        }
+                    }
+                }
+            });
+        });
+
+    // Load tables - data comes from our own trusted API
+    fetch(`/api/tables/${rider}`)
+        .then(r => r.json())
+        .then(data => {
+            function renderTable(containerId, tableData) {
+                const container = document.getElementById(containerId);
+                const table = document.createElement('table');
+
+                // Header
+                const thead = document.createElement('thead');
+                const headerRow = document.createElement('tr');
+                tableData.columns.forEach(col => {
+                    const th = document.createElement('th');
+                    th.textContent = col;
+                    headerRow.appendChild(th);
+                });
+                thead.appendChild(headerRow);
+                table.appendChild(thead);
+
+                // Body
+                const tbody = document.createElement('tbody');
+                tableData.data.forEach(row => {
+                    const tr = document.createElement('tr');
+                    const labelTd = document.createElement('td');
+                    labelTd.textContent = row.label;
+                    tr.appendChild(labelTd);
+
+                    tableData.columns.slice(1).forEach(col => {
+                        const td = document.createElement('td');
+                        td.textContent = row[col] !== undefined ? row[col] : '-';
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+                table.appendChild(tbody);
+
+                container.replaceChildren(table);
+            }
+
+            renderTable('yearlyTripsTable', data.yearly_trips);
+            renderTable('yearlyCostsTable', data.yearly_costs);
+            renderTable('monthlyTripsTable', data.monthly_trips);
+            renderTable('monthlyCostsTable', data.monthly_costs);
+        });
+</script>
+{% endblock %}

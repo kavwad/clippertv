@@ -19,9 +19,15 @@ dependencies = [
 dashboard = [
     "streamlit>=1.50.0",
 ]
+web = [
+    "fastapi>=0.115.0",
+    "jinja2>=3.1.0",
+    "uvicorn>=0.34.0",
+]
 
 [project.scripts]
 clippertv = "clippertv.app:main"
+clippertv-web = "clippertv.web.main:run"
 
 [build-system]
 requires = ["setuptools>=61.0"]

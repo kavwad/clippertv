@@ -2,7 +2,11 @@
 
 ## Quick Commands
 ```bash
-# Run app (requires dashboard dependencies)
+# Run FastAPI app (mobile-friendly, recommended)
+uv sync --extra web
+uv run uvicorn clippertv.web.main:app --reload --host 0.0.0.0
+
+# Run Streamlit app (desktop-focused)
 uv sync --extra dashboard
 uv run streamlit run src/clippertv/app.py
 
@@ -29,9 +33,12 @@ uv run mypy src/
 - HTTP: `requests`, `bs4`
 
 **Optional dependencies** (`--extra dashboard`):
-- Dashboard UI: `streamlit`, `pandas`, `plotly`, `python-multipart`
+- Streamlit UI: `streamlit`
 
-The Raspberry Pi scheduler only needs core dependencies (no Streamlit).
+**Optional dependencies** (`--extra web`):
+- FastAPI UI: `fastapi`, `jinja2`, `uvicorn`
+
+The Raspberry Pi scheduler only needs core dependencies (no UI packages).
 
 ## Architecture
 
@@ -45,6 +52,16 @@ The Raspberry Pi scheduler only needs core dependencies (no Streamlit).
 ### Authentication (`src/clippertv/auth/`)
 - `service.py` - AuthService (JWT tokens, password hashing with bcrypt)
 - `crypto.py` - CredentialEncryption (Fernet encryption for Clipper credentials)
+
+### Visualization (`src/clippertv/viz/`)
+- `data_processing.py` - Pivot tables and stats (shared by both UIs)
+- `dashboard.py` - Streamlit display functions
+- `charts.py` - Plotly charts for Streamlit
+
+### Web UI (`src/clippertv/web/`)
+- `main.py` - FastAPI app entry point
+- `routes.py` - Dashboard and API endpoints
+- `templates/` - Jinja2 templates with Chart.js
 
 ### Configuration (`src/clippertv/config.py`)
 - `AppConfig` - App settings (transit categories, colors)

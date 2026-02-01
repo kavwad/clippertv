@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from clippertv.viz.dashboard import (
+from clippertv.viz.data_processing import (
     calculate_summary_stats,
     create_pivot_month,
     create_pivot_month_cost,
