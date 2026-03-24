@@ -207,17 +207,16 @@ class TursoStore:
     def _reconstruct_category(
         self, transit_mode: Optional[str], transaction_type: str
     ) -> str:
-        """Reconstruct category from old PDF-era transit_mode + transaction_type."""
+        """Reconstruct category for legacy rows without a stored category.
+
+        Only used for pre-2023 PDF data and manual entries (which have
+        transit_id but no category column). Post-2023 data uses stored
+        category from CSV ingestion.
+        """
         if transaction_type == "reload":
             return "Reload"
         if not transit_mode:
             return "Unknown"
-        dual_tag_modes = {"BART", "Caltrain", "Ferry"}
-        if transit_mode in dual_tag_modes:
-            if transaction_type == "entry":
-                return f"{transit_mode} Entrance"
-            elif transaction_type == "exit":
-                return f"{transit_mode} Exit"
         return transit_mode
 
     # --- Save ---
