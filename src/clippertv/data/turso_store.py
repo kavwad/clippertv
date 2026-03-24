@@ -208,6 +208,15 @@ class TursoStore:
                     t.transaction_date,
                     t.transaction_type,
                     tm.name as transit_mode,
+                    COALESCE(t.start_location, t.location) as start_location,
+                    t.end_location,
+                    COALESCE(t.fare, t.debit) as fare,
+                    t.operator,
+                    t.pass_type,
+                    t.trip_id,
+                    t.end_datetime,
+                    t.source,
+                    t.category as stored_category,
                     t.location,
                     t.route,
                     t.debit,
@@ -229,25 +238,53 @@ class TursoStore:
                 transaction_date = pd.to_datetime(row[1], utc=True).tz_convert(None)
                 transaction_type = row[2]
                 transit_mode = row[3]
-                location = row[4]
-                route = row[5]
-                debit = row[6]
-                credit = row[7]
-                balance = row[8]
-                product = row[9]
+                start_location = row[4]
+                end_location = row[5]
+                fare = row[6]
+                operator = row[7]
+                pass_type = row[8]
+                trip_id = row[9]
+                end_datetime = row[10]
+                source = row[11]
+                stored_category = row[12]
+                location = row[13]
+                route = row[14]
+                debit = row[15]
+                credit = row[16]
+                balance = row[17]
+                product = row[18]
 
-                category = self._reconstruct_category(transit_mode, transaction_type)
+                if stored_category:
+                    category = stored_category
+                else:
+                    raw_category = self._reconstruct_category(transit_mode, transaction_type)
+                    # Strip " Entrance" and " Exit" suffixes from old PDF rows
+                    if raw_category.endswith(" Entrance"):
+                        category = raw_category[:-9]
+                    elif raw_category.endswith(" Exit"):
+                        category = raw_category[:-5]
+                    else:
+                        category = raw_category
 
                 grouped[rider_id].append({
                     'Transaction Date': transaction_date,
-                    'Transaction Type': transaction_type,
                     'Category': category,
-                    'Location': location,
-                    'Route': route,
+                    'Fare': fare,
+                    'Start Location': start_location,
+                    'End Location': end_location,
+                    'Operator': operator,
+                    'Trip ID': trip_id,
+                    'End Datetime': end_datetime,
+                    'Pass Type': pass_type,
+                    'Source': source,
+                    # Legacy columns kept for backwards compat during transition
+                    'Transaction Type': transaction_type,
                     'Debit': debit,
                     'Credit': credit,
                     'Balance': balance,
-                    'Product': product
+                    'Product': product,
+                    'Location': location,
+                    'Route': route,
                 })
 
             for rider_id in missing:
@@ -256,8 +293,11 @@ class TursoStore:
                     df = pd.DataFrame(rider_rows)
                 else:
                     df = pd.DataFrame(columns=[
-                        'Transaction Date', 'Transaction Type', 'Category',
-                        'Location', 'Route', 'Debit', 'Credit', 'Balance', 'Product'
+                        'Transaction Date', 'Category', 'Fare',
+                        'Start Location', 'End Location', 'Operator',
+                        'Trip ID', 'End Datetime', 'Pass Type', 'Source',
+                        'Transaction Type', 'Debit', 'Credit', 'Balance',
+                        'Product', 'Location', 'Route',
                     ])
                     df['Transaction Date'] = pd.to_datetime(df['Transaction Date'])
 
@@ -294,6 +334,65 @@ class TursoStore:
 
         # All other modes don't use entrance/exit in their category name
         return transit_mode
+
+    def save_csv_transactions(
+        self, rider_id: str, df: pd.DataFrame, user_id: Optional[str] = None
+    ) -> int:
+        """Save CSV-sourced transactions using trip_id for deduplication.
+
+        Args:
+            rider_id: Rider identifier.
+            df: DataFrame with columns: transaction_date, end_datetime,
+                start_location, end_location, fare, operator, pass_type,
+                trip_id, category.
+            user_id: Optional user ID for row-level security.
+
+        Returns:
+            Number of new rows inserted.
+        """
+        self._ensure_rider_exists(rider_id)
+
+        # Get existing trip_ids for this rider
+        result = self._execute(
+            "SELECT trip_id FROM trips WHERE rider_id = ? AND trip_id IS NOT NULL",
+            [rider_id],
+        )
+        existing_trip_ids = {row[0] for row in result.fetchall()}
+
+        new_rows = df[~df["trip_id"].isin(existing_trip_ids)]
+        if new_rows.empty:
+            return 0
+
+        for _, row in new_rows.iterrows():
+            transaction_date = row["transaction_date"]
+            if pd.isna(transaction_date):
+                continue
+            self._execute(
+                """
+                INSERT INTO trips (
+                    rider_id, trip_id, transaction_date, end_datetime,
+                    start_location, end_location, fare, operator,
+                    pass_type, category, source, user_id, transaction_type
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'csv', ?, 'trip')
+                """,
+                [
+                    rider_id,
+                    row["trip_id"],
+                    pd.Timestamp(transaction_date).isoformat(),
+                    pd.Timestamp(row["end_datetime"]).isoformat() if pd.notna(row.get("end_datetime")) else None,
+                    row.get("start_location") if pd.notna(row.get("start_location")) else None,
+                    row.get("end_location") if pd.notna(row.get("end_location")) else None,
+                    float(row["fare"]) if pd.notna(row.get("fare")) else None,
+                    row.get("operator"),
+                    row.get("pass_type") if pd.notna(row.get("pass_type")) else None,
+                    row.get("category"),
+                    user_id,
+                ],
+            )
+
+        self._commit()
+        self.invalidate_cache(rider_id)
+        return len(new_rows)
 
     def save_data(self, rider_id: str, df: pd.DataFrame, user_id: Optional[str] = None) -> None:
         """

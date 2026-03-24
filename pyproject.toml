@@ -5,6 +5,7 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "bs4>=0.0.2",
     "camelot-py>=1.0.0",
+    "pandas>=2.0.0",
     "pydantic[email]>=2.6.0",
     "requests>=2.32.0",
     "libsql>=0.1.11",
@@ -35,7 +36,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = ["clippertv"]
+packages = ["clippertv", "clippertv.ingest"]
 
 [dependency-groups]
 dev = [

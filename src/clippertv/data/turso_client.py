@@ -164,6 +164,39 @@ def initialize_database(force: bool = False) -> None:
         if "content_hash" not in trips_columns:
             conn.execute("ALTER TABLE trips ADD COLUMN content_hash TEXT")
 
+        if "user_id" not in trips_columns:
+            conn.execute("ALTER TABLE trips ADD COLUMN user_id TEXT")
+
+        # CSV migration columns
+        csv_columns = {
+            "trip_id": "TEXT",
+            "end_datetime": "TEXT",
+            "start_location": "TEXT",
+            "end_location": "TEXT",
+            "fare": "REAL",
+            "operator": "TEXT",
+            "pass_type": "TEXT",
+            "source": "TEXT",
+            "category": "TEXT",
+        }
+        for col_name, col_type in csv_columns.items():
+            if col_name not in trips_columns:
+                conn.execute(f"ALTER TABLE trips ADD COLUMN {col_name} {col_type}")
+
+        # Backfill source for existing rows
+        conn.execute(
+            "UPDATE trips SET source = 'pdf' WHERE source IS NULL"
+            " AND transaction_date IS NOT NULL AND trip_id IS NULL"
+        )
+
+        # Index for trip_id dedup
+        conn.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_id
+            ON trips(trip_id) WHERE trip_id IS NOT NULL
+            """
+        )
+
         # Create indices
         conn.execute("CREATE INDEX IF NOT EXISTS trips_rider_id_idx ON trips(rider_id)")
         conn.execute(
