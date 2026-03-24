@@ -38,4 +38,19 @@ where = ["src"]
 [dependency-groups]
 dev = [
     "pytest>=8.4.2",
+    "ruff>=0.15.7",
+    "ty>=0.0.24",
 ]
+
+[tool.ruff]
+src = ["src"]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ty.environment]
+python-version = "3.13"
+
+[tool.ty.src]
+include = ["src/**/*.py"]

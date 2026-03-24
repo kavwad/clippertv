@@ -11,12 +11,7 @@ from ..auth.crypto import CredentialEncryption
 class UserStore:
     """Manage user accounts and Clipper cards."""
 
-    def __init__(
-        self,
-        client,
-        auth_service: AuthService,
-        crypto: CredentialEncryption
-    ):
+    def __init__(self, client, auth_service: AuthService, crypto: CredentialEncryption):
         """
         Initialize user store.
 
@@ -29,7 +24,7 @@ class UserStore:
         self.auth = auth_service
         self.crypto = crypto
 
-    def create_user(self, user_data: UserCreate) -> User:
+    def create_user(self, user_data: UserCreate) -> Optional[User]:
         """
         Register new user account.
 
@@ -56,7 +51,7 @@ class UserStore:
             INSERT INTO users (id, email, password_hash, name, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?)
             """,
-            [user_id, user_data.email, password_hash, user_data.name, now, now]
+            [user_id, user_data.email, password_hash, user_data.name, now, now],
         )
         self.client.commit()
 
@@ -74,7 +69,7 @@ class UserStore:
         """
         result = self.client.execute(
             "SELECT id, email, name, created_at, updated_at FROM users WHERE email = ?",
-            [email]
+            [email],
         )
         row = result.fetchone()
 
@@ -86,7 +81,7 @@ class UserStore:
             email=row[1],
             name=row[2],
             created_at=datetime.fromisoformat(row[3]) if row[3] else datetime.now(),
-            updated_at=datetime.fromisoformat(row[4]) if row[4] else datetime.now()
+            updated_at=datetime.fromisoformat(row[4]) if row[4] else datetime.now(),
         )
 
     def get_user_by_id(self, user_id: str) -> Optional[User]:
@@ -101,7 +96,7 @@ class UserStore:
         """
         result = self.client.execute(
             "SELECT id, email, name, created_at, updated_at FROM users WHERE id = ?",
-            [user_id]
+            [user_id],
         )
         row = result.fetchone()
 
@@ -113,7 +108,7 @@ class UserStore:
             email=row[1],
             name=row[2],
             created_at=datetime.fromisoformat(row[3]) if row[3] else datetime.now(),
-            updated_at=datetime.fromisoformat(row[4]) if row[4] else datetime.now()
+            updated_at=datetime.fromisoformat(row[4]) if row[4] else datetime.now(),
         )
 
     def verify_user_credentials(self, email: str, password: str) -> Optional[User]:
@@ -129,7 +124,7 @@ class UserStore:
         """
         result = self.client.execute(
             "SELECT id, email, name, password_hash, created_at, updated_at FROM users WHERE email = ?",
-            [email]
+            [email],
         )
         row = result.fetchone()
 
@@ -146,13 +141,11 @@ class UserStore:
             email=row[1],
             name=row[2],
             created_at=datetime.fromisoformat(row[4]) if row[4] else datetime.now(),
-            updated_at=datetime.fromisoformat(row[5]) if row[5] else datetime.now()
+            updated_at=datetime.fromisoformat(row[5]) if row[5] else datetime.now(),
         )
 
     def add_clipper_card(
-        self,
-        user_id: str,
-        card_data: ClipperCardCreate
+        self, user_id: str, card_data: ClipperCardCreate
     ) -> ClipperCard:
         """
         Associate Clipper card with user account.
@@ -170,11 +163,13 @@ class UserStore:
         # Check if card already exists for this user
         existing = self.client.execute(
             "SELECT id FROM clipper_cards WHERE user_id = ? AND card_number = ?",
-            [user_id, card_data.card_number]
+            [user_id, card_data.card_number],
         ).fetchone()
 
         if existing:
-            raise ValueError(f"Card {card_data.card_number} already exists for this user")
+            raise ValueError(
+                f"Card {card_data.card_number} already exists for this user"
+            )
 
         card_id = str(uuid.uuid4())
         now = datetime.now().isoformat()
@@ -183,15 +178,13 @@ class UserStore:
         credentials_encrypted = None
         if card_data.credentials:
             credentials_encrypted = self.crypto.encrypt_credentials(
-                card_data.credentials["username"],
-                card_data.credentials["password"]
+                card_data.credentials["username"], card_data.credentials["password"]
             )
 
         # If this is primary card, unset other primary cards for this user
         if card_data.is_primary:
             self.client.execute(
-                "UPDATE clipper_cards SET is_primary = 0 WHERE user_id = ?",
-                [user_id]
+                "UPDATE clipper_cards SET is_primary = 0 WHERE user_id = ?", [user_id]
             )
 
         self.client.execute(
@@ -199,7 +192,15 @@ class UserStore:
             INSERT INTO clipper_cards (id, user_id, card_number, rider_name, credentials_encrypted, is_primary, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            [card_id, user_id, card_data.card_number, card_data.rider_name, credentials_encrypted, card_data.is_primary, now]
+            [
+                card_id,
+                user_id,
+                card_data.card_number,
+                card_data.rider_name,
+                credentials_encrypted,
+                card_data.is_primary,
+                now,
+            ],
         )
         self.client.commit()
 
@@ -220,7 +221,7 @@ class UserStore:
             SELECT id, user_id, card_number, rider_name, credentials_encrypted, is_primary, created_at
             FROM clipper_cards WHERE id = ?
             """,
-            [card_id]
+            [card_id],
         )
         row = result.fetchone()
 
@@ -234,7 +235,7 @@ class UserStore:
             rider_name=row[3],
             credentials_encrypted=row[4],
             is_primary=bool(row[5]),
-            created_at=datetime.fromisoformat(row[6]) if row[6] else datetime.now()
+            created_at=datetime.fromisoformat(row[6]) if row[6] else datetime.now(),
         )
 
     def get_user_clipper_cards(self, user_id: str) -> List[ClipperCard]:
@@ -252,20 +253,24 @@ class UserStore:
             SELECT id, user_id, card_number, rider_name, credentials_encrypted, is_primary, created_at
             FROM clipper_cards WHERE user_id = ? ORDER BY is_primary DESC, created_at ASC
             """,
-            [user_id]
+            [user_id],
         )
 
         cards = []
         for row in result.fetchall():
-            cards.append(ClipperCard(
-                id=row[0],
-                user_id=row[1],
-                card_number=row[2],
-                rider_name=row[3],
-                credentials_encrypted=row[4],
-                is_primary=bool(row[5]),
-                created_at=datetime.fromisoformat(row[6]) if row[6] else datetime.now()
-            ))
+            cards.append(
+                ClipperCard(
+                    id=row[0],
+                    user_id=row[1],
+                    card_number=row[2],
+                    rider_name=row[3],
+                    credentials_encrypted=row[4],
+                    is_primary=bool(row[5]),
+                    created_at=datetime.fromisoformat(row[6])
+                    if row[6]
+                    else datetime.now(),
+                )
+            )
 
         return cards
 
@@ -301,12 +306,12 @@ class UserStore:
         if is_primary:
             self.client.execute(
                 "UPDATE clipper_cards SET is_primary = 0 WHERE user_id = ?",
-                [card.user_id]
+                [card.user_id],
             )
 
         self.client.execute(
             "UPDATE clipper_cards SET is_primary = ? WHERE id = ?",
-            [is_primary, card_id]
+            [is_primary, card_id],
         )
         self.client.commit()
 
@@ -317,8 +322,5 @@ class UserStore:
         Args:
             card_id: Unique card identifier
         """
-        self.client.execute(
-            "DELETE FROM clipper_cards WHERE id = ?",
-            [card_id]
-        )
+        self.client.execute("DELETE FROM clipper_cards WHERE id = ?", [card_id])
         self.client.commit()

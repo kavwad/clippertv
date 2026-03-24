@@ -7,7 +7,7 @@ from typing import Any, Optional
 try:
     import libsql
 except ImportError:
-    libsql = None
+    libsql = None  # ty: ignore[invalid-assignment]
 
 
 _conn_lock = Lock()
@@ -18,10 +18,7 @@ _db_initialized = False
 def _create_turso_client():
     """Create a new Turso client connection."""
     if libsql is None:
-        raise ImportError(
-            "libsql is not installed. "
-            "Install it with: uv add libsql"
-        )
+        raise ImportError("libsql is not installed. Install it with: uv add libsql")
 
     # Get configuration from environment variables
     db_url = os.environ.get("TURSO_DATABASE_URL")
@@ -218,7 +215,7 @@ def initialize_database(force: bool = False) -> None:
             for name, display_name, color in transit_modes:
                 conn.execute(
                     "INSERT INTO transit_modes (name, display_name, color) VALUES (?, ?, ?)",
-                    [name, display_name, color]
+                    [name, display_name, color],
                 )
 
         # Commit changes once all setup is done
