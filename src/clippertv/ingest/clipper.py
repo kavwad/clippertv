@@ -8,8 +8,13 @@ normalized DataFrames.
 import argparse
 import os
 import sys
+import time
 from datetime import date, datetime, timedelta
 from io import StringIO
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import pandas as pd
 import requests
@@ -293,9 +298,9 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--config",
-        default=".streamlit/secrets.toml",
+        default="clipper.toml",
         dest="config_file",
-        help="Path to config file (TOML)",
+        help="Path to Clipper config file (TOML)",
     )
     parser.add_argument(
         "--ingest",
@@ -307,8 +312,19 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _load_config(path: str) -> dict:
+    """Load TOML config file."""
     with open(path, "rb") as f:
         return tomllib.load(f)
+
+
+def _build_card_to_rider(accounts: list[dict]) -> dict[str, str]:
+    """Build a mapping of card number → rider name from config accounts."""
+    mapping = {}
+    for account in accounts:
+        rider = account["name"]
+        for card in account.get("cards", []):
+            mapping[card] = rider
+    return mapping
 
 
 def main() -> int:
@@ -326,34 +342,33 @@ def main() -> int:
     if not args.user and not args.all and not args.email and not args.password:
         args.all = True
 
-    users: list[tuple[str, str, str]] = []
+    accounts: list[dict] = []
     if args.user or args.all:
         try:
             config_data = _load_config(args.config_file)
         except Exception as e:
             sys.stderr.write(f"Error loading config file {args.config_file}: {e}\n")
             return 2
-        clipper_cfg = config_data.get("clipper", {})
-        cfg_users = clipper_cfg.get("users", {})
+        all_accounts = config_data.get("accounts", [])
         if args.user:
-            if args.user not in cfg_users:
+            matched = [a for a in all_accounts if a["name"] == args.user]
+            if not matched:
+                names = [a["name"] for a in all_accounts]
                 sys.stderr.write(f"User '{args.user}' not found in config file\n")
-                sys.stderr.write("Available users: " + " ".join(cfg_users.keys()) + "\n")
+                sys.stderr.write(f"Available: {', '.join(names)}\n")
                 return 2
-            u = cfg_users[args.user]
-            users.append((args.user, u.get("email", ""), u.get("password", "")))
+            accounts = matched
         else:
-            for name, u in cfg_users.items():
-                users.append((name, u.get("email", ""), u.get("password", "")))
+            accounts = all_accounts
     else:
         if not args.email or not args.password:
             sys.stderr.write("Please provide credentials\n")
             sys.stderr.write(
-                f"Usage: {sys.argv[0]} [--user=username] [--all] OR "
+                f"Usage: {sys.argv[0]} [--user=name] [--all] OR "
                 "[--email=email --password=password] [options]\n"
             )
             return 2
-        users.append(("manual", args.email, args.password))
+        accounts = [{"name": "manual", "email": args.email, "password": args.password, "cards": []}]
 
     start_date = args.start_date
     end_date = args.end_date
@@ -370,10 +385,13 @@ def main() -> int:
     else:
         print("Downloading CSV transaction reports...")
 
+    card_to_rider = _build_card_to_rider(accounts)
+
     all_downloaded = []
-    for uname, email, pw in users:
-        if len(users) > 1:
-            print(f"\n=== Processing user: {uname} ({email}) ===")
+    for account in accounts:
+        name, email, pw = account["name"], account["email"], account["password"]
+        if len(accounts) > 1:
+            print(f"\n=== Processing account: {name} ({email}) ===")
         session = requests.Session()
         session.headers.update({"User-Agent": USER_AGENT})
         try:
@@ -383,7 +401,7 @@ def main() -> int:
             )
             all_downloaded.extend(results)
         except Exception as e:
-            sys.stderr.write(f"Error for user {uname}: {e}\n")
+            sys.stderr.write(f"Error for {name}: {e}\n")
             return 1
 
     if args.ingest and not args.dry_run:
@@ -398,20 +416,17 @@ def main() -> int:
                 print(f"  No transactions in {download['path']}")
                 continue
             for account_number, card_df in df.groupby("account_number"):
-                # Use account_number as rider_id for now.
-                # Full card->rider->user lookup via clipper_cards table is
-                # deferred to the scheduler task (when multi-user is wired up).
-                rider_id = str(account_number)
+                rider_id = card_to_rider.get(str(account_number), str(account_number))
                 count = run_ingest(
                     card_df, rider_id=rider_id, user_id=None, store=store
                 )
-                print(f"  {count} new transactions for rider {rider_id}")
+                print(f"  {count} new transactions for {rider_id}")
 
     if args.dry_run:
         print("\n[DRY RUN] Test completed successfully.")
     else:
         print(
-            f"\nCSV downloads completed for {len(users)} user(s). "
+            f"\nCSV downloads completed for {len(accounts)} user(s). "
             f"Files saved to: {args.output}"
         )
     return 0
