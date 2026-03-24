@@ -1,6 +1,8 @@
 .streamlit/
+clipper.toml
 backups/
 tmp/
+docs/
 
 # Scheduler-generated files
 pdf/
