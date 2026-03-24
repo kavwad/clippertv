@@ -193,11 +193,23 @@ def download_csv(
         "filterTA": "All Clipper Cards",
     }
 
-    resp = session.post(
-        f"{HOST}/download-trip-history/CSV",
-        json=payload,
-        headers=headers,
-    )
+    max_retries = 3
+    for attempt in range(max_retries):
+        resp = session.post(
+            f"{HOST}/download-trip-history/CSV",
+            json=payload,
+            headers=headers,
+        )
+
+        is_server_error = resp.status_code >= 500
+        is_transient_404 = resp.status_code == 404 and "50x.html" in resp.text
+        if (is_server_error or is_transient_404) and attempt < max_retries - 1:
+            wait = 2**attempt
+            print(f"Server error ({resp.status_code}), retrying in {wait}s...")
+            time.sleep(wait)
+            continue
+
+        break
 
     if resp.status_code == 404:
         raise RuntimeError(
@@ -218,6 +230,18 @@ def download_csv(
     return resp.text
 
 
+def _monthly_chunks(start_date: str, end_date: str) -> list[tuple[str, str]]:
+    """Split a date range into monthly chunks of at most 30 days."""
+    start = date.fromisoformat(start_date)
+    end = date.fromisoformat(end_date)
+    chunks = []
+    while start < end:
+        chunk_end = min(start + timedelta(days=30), end)
+        chunks.append((start.isoformat(), chunk_end.isoformat()))
+        start = chunk_end + timedelta(days=1)
+    return chunks
+
+
 def download_transactions(
     session: requests.Session,
     output_dir: str,
@@ -227,23 +251,48 @@ def download_transactions(
 ) -> list[dict]:
     """Download transactions as CSV and save to file.
 
+    Ranges longer than 30 days are split into monthly chunks to avoid
+    server timeouts.
+
     Returns:
         List of dicts with 'path' and 'content' keys, or empty list on dry run.
     """
-    csv_content = download_csv(session, start_date, end_date, dry_run)
+    if start_date and end_date:
+        chunks = _monthly_chunks(start_date, end_date)
+    else:
+        chunks = [(start_date, end_date)]
 
-    if dry_run or not csv_content:
+    all_lines: list[str] = []
+    header: str | None = None
+
+    for i, (chunk_start, chunk_end) in enumerate(chunks):
+        if len(chunks) > 1:
+            print(f"Downloading chunk {i + 1}/{len(chunks)}: {chunk_start} to {chunk_end}")
+        csv_content = download_csv(session, chunk_start, chunk_end, dry_run)
+
+        if dry_run or not csv_content:
+            continue
+
+        lines = csv_content.strip().splitlines()
+        if header is None:
+            header = lines[0]
+            all_lines.append(header)
+        all_lines.extend(lines[1:])
+
+    if dry_run or not all_lines:
         return []
+
+    combined = "\n".join(all_lines) + "\n"
 
     os.makedirs(output_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = os.path.join(output_dir, f"clipper-transactions-{timestamp}.csv")
 
     with open(filename, "w") as f:
-        f.write(csv_content)
+        f.write(combined)
 
     print(f"Saved CSV: {filename}")
-    return [{"path": filename, "content": csv_content}]
+    return [{"path": filename, "content": combined}]
 
 
 # ---------------------------------------------------------------------------
