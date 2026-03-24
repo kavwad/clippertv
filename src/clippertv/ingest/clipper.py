@@ -357,6 +357,12 @@ def _parse_args() -> argparse.Namespace:
         dest="ingest",
         help="After downloading, process and load transactions into the data store",
     )
+    parser.add_argument(
+        "--ingest-file",
+        dest="ingest_file",
+        nargs="+",
+        help="Ingest one or more existing CSV files into the data store (skips download)",
+    )
     return parser.parse_args()
 
 
@@ -379,6 +385,34 @@ def _build_card_to_rider(accounts: list[dict]) -> dict[str, str]:
 def main() -> int:
     """CLI entry point for Clipper CSV downloader."""
     args = _parse_args()
+
+    if args.ingest_file:
+        from clippertv.data.factory import get_data_store
+        from clippertv.ingest.pipeline import ingest as run_ingest
+
+        try:
+            config_data = _load_config(args.config_file)
+        except Exception as e:
+            sys.stderr.write(f"Error loading config file {args.config_file}: {e}\n")
+            return 2
+        card_to_rider = _build_card_to_rider(config_data.get("accounts", []))
+        store = get_data_store()
+
+        for filepath in args.ingest_file:
+            print(f"Ingesting {filepath}...")
+            with open(filepath) as f:
+                csv_content = f.read()
+            df = parse_csv(csv_content)
+            if df.empty:
+                print(f"  No transactions in {filepath}")
+                continue
+            for account_number, card_df in df.groupby("account_number"):
+                rider_id = card_to_rider.get(str(account_number), str(account_number))
+                count = run_ingest(
+                    card_df, rider_id=rider_id, user_id=None, store=store
+                )
+                print(f"  {count} new transactions for {rider_id}")
+        return 0
 
     if (
         (args.user and args.all)
