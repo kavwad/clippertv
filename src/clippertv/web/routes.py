@@ -7,7 +7,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from clippertv.config import config
+from clippertv.config import config, load_rider_mapping
 from clippertv.data.factory import get_data_store
 from clippertv.viz.data_processing import (
     process_data,
@@ -24,6 +24,21 @@ _data_store = None
 
 RIDER_COLORS = ["#0099CC", "#00A55E", "#FDB813", "#BA0C2F", "#6C6C6C", "#4DD0E1"]
 
+# rider_id → display name mapping (from clipper.toml)
+_rider_map = load_rider_mapping()
+
+
+def _display_name(rider_id: str) -> str:
+    """Resolve a rider_id to a capitalized display name."""
+    name = _rider_map.get(rider_id, rider_id)
+    return name.capitalize() if name.isalpha() else name
+
+
+def _rider_ids_for(display_name: str) -> list[str]:
+    """Get all rider_ids that map to a given display name."""
+    lower = display_name.lower()
+    return [rid for rid, name in _rider_map.items() if name.lower() == lower]
+
 
 def get_store():
     """Get cached data store instance."""
@@ -34,8 +49,36 @@ def get_store():
 
 
 def get_riders(store) -> list[str]:
-    """Get list of rider IDs from the database."""
-    return store.list_riders()
+    """Get deduplicated display names for all riders in the database."""
+    raw_ids = store.list_riders()
+    seen = {}
+    for rid in raw_ids:
+        name = _display_name(rid)
+        if name not in seen:
+            seen[name] = rid
+    return list(seen.keys())
+
+
+def _load_rider_df(store, rider: str) -> pd.DataFrame:
+    """Load and concatenate data for all rider_ids behind a display name."""
+    raw_ids = _rider_ids_for(rider)
+    # Also include the display name itself in case it's used directly as a rider_id
+    if rider not in raw_ids:
+        raw_ids.append(rider)
+    # Only query IDs that actually exist in the DB
+    db_ids = set(store.list_riders())
+    query_ids = [rid for rid in raw_ids if rid in db_ids]
+    if not query_ids:
+        return pd.DataFrame(columns=[
+            "Transaction Date", "Category", "Fare",
+        ])
+    data = store.load_multiple_riders(query_ids)
+    frames = [df for df in data.values() if not df.empty]
+    if not frames:
+        return pd.DataFrame(columns=[
+            "Transaction Date", "Category", "Fare",
+        ])
+    return pd.concat(frames, ignore_index=True)
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -52,7 +95,7 @@ async def dashboard(request: Request, rider: str = ""):
     if rider not in riders:
         rider = riders[0]
 
-    df = store.load_data(rider)
+    df = _load_rider_df(store, rider)
 
     pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(df)
     stats = calculate_summary_stats(pivot_month, pivot_month_cost, df)
@@ -76,7 +119,7 @@ async def dashboard(request: Request, rider: str = ""):
 async def get_trip_data(rider: str):
     """Return trip chart data as JSON for Chart.js."""
     store = get_store()
-    df = store.load_data(rider)
+    df = _load_rider_df(store, rider)
     pivot_month = create_pivot_month(df)
 
     # Sort chronologically for chart (oldest first)
@@ -104,7 +147,7 @@ async def get_trip_data(rider: str):
 async def get_cost_data(rider: str):
     """Return cost chart data as JSON for Chart.js."""
     store = get_store()
-    df = store.load_data(rider)
+    df = _load_rider_df(store, rider)
     pivot_month_cost = create_pivot_month_cost(df)
 
     # Sort chronologically for chart (oldest first)
@@ -136,13 +179,14 @@ async def get_comparison_data():
     if not riders:
         return {"labels": [], "datasets": []}
 
-    rider_data = store.load_multiple_riders(riders)
+    # Load consolidated data per display name
+    rider_dfs = {name: _load_rider_df(store, name) for name in riders}
 
     # Find date range
     start_date = None
     latest_date = None
 
-    for rider, df in rider_data.items():
+    for rider, df in rider_dfs.items():
         if df.empty:
             continue
         rider_first = df["Transaction Date"].min()
@@ -163,8 +207,18 @@ async def get_comparison_data():
 
     datasets = []
     for i, rider in enumerate(riders):
-        df = rider_data[rider]
+        df = rider_dfs[rider]
         color = RIDER_COLORS[i % len(RIDER_COLORS)]
+        if df.empty:
+            datasets.append({
+                "label": rider,
+                "data": [0] * len(complete_index),
+                "borderColor": color,
+                "backgroundColor": color,
+                "fill": False,
+                "tension": 0.3,
+            })
+            continue
         pivot = (
             df.groupby([pd.Grouper(key="Transaction Date", freq="ME"), "Category"])
             .size()
@@ -193,7 +247,7 @@ async def get_comparison_data():
 async def get_table_data(rider: str):
     """Return pivot table data for display."""
     store = get_store()
-    df = store.load_data(rider)
+    df = _load_rider_df(store, rider)
 
     pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, _ = process_data(df)
 

@@ -373,12 +373,19 @@ def _load_config(path: str) -> dict:
 
 
 def _build_card_to_rider(accounts: list[dict]) -> dict[str, str]:
-    """Build a mapping of card number → rider name from config accounts."""
+    """Build a mapping of card/alias → rider name.
+
+    Account numbers are NOT mapped — they pass through as rider_ids
+    so the DB stores raw Clipper identifiers. Display name resolution
+    happens at read time via clipper.toml.
+    """
     mapping = {}
     for account in accounts:
         rider = account["name"]
         for card in account.get("cards", []):
             mapping[card] = rider
+        for alias in account.get("aliases", []):
+            mapping[alias] = rider
     return mapping
 
 

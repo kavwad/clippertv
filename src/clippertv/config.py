@@ -1,6 +1,8 @@
 """Configuration management for ClipperTV."""
 
 import os
+import tomllib
+from pathlib import Path
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel
@@ -106,3 +108,22 @@ class EnvConfig:
 
 
 env_config = EnvConfig()
+
+
+def load_rider_mapping(config_path: str = "clipper.toml") -> Dict[str, str]:
+    """Build rider_id → display name mapping from clipper.toml.
+
+    Maps card numbers, account numbers, and aliases to the rider name.
+    """
+    path = Path(config_path)
+    if not path.exists():
+        return {}
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+    mapping: Dict[str, str] = {}
+    for account in data.get("accounts", []):
+        name = account["name"]
+        for key in ("cards", "accounts", "aliases"):
+            for val in account.get(key, []):
+                mapping[val] = name
+    return mapping
