@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 def ingest(
     df: pd.DataFrame,
     rider_id: str,
-    user_id: str,
+    user_id: str | None,
     store: TursoStore,
 ) -> int:
     """Categorize, dedup, and store transactions.

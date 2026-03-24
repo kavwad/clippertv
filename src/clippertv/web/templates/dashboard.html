@@ -9,6 +9,12 @@
 
 <h1>Welcome to Clipper TV!</h1>
 
+{% if rider is none %}
+<div class="stats">
+    <p>No data yet. Use <code>clipper-download --ingest</code> to import transactions.</p>
+</div>
+{% else %}
+
 <div class="stats">
     <p>
         <strong>{{ rider }}</strong> took <span class="highlight">{{ stats.trips_this_month }}</span> trips in
@@ -76,6 +82,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}

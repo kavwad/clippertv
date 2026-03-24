@@ -66,4 +66,4 @@ def test_ingest_passes_rider_and_user():
 
     call_args = store.save_csv_transactions.call_args
     assert call_args[0][0] == "K"  # rider_id
-    assert call_args[1]["user_id"] == "u1" or call_args[0][2] == "u1"
+    assert call_args[1]["user_id"] == "u1"

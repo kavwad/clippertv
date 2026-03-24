@@ -363,10 +363,15 @@ class TursoStore:
         if new_rows.empty:
             return 0
 
+        def _nullable(val):
+            return None if pd.isna(val) else val
+
+        inserted = 0
         for _, row in new_rows.iterrows():
             transaction_date = row["transaction_date"]
             if pd.isna(transaction_date):
                 continue
+            end_dt = _nullable(row.get("end_datetime"))
             self._execute(
                 """
                 INSERT INTO trips (
@@ -379,20 +384,21 @@ class TursoStore:
                     rider_id,
                     row["trip_id"],
                     pd.Timestamp(transaction_date).isoformat(),
-                    pd.Timestamp(row["end_datetime"]).isoformat() if pd.notna(row.get("end_datetime")) else None,
-                    row.get("start_location") if pd.notna(row.get("start_location")) else None,
-                    row.get("end_location") if pd.notna(row.get("end_location")) else None,
+                    pd.Timestamp(end_dt).isoformat() if end_dt is not None else None,
+                    _nullable(row.get("start_location")),
+                    _nullable(row.get("end_location")),
                     float(row["fare"]) if pd.notna(row.get("fare")) else None,
                     row.get("operator"),
-                    row.get("pass_type") if pd.notna(row.get("pass_type")) else None,
+                    _nullable(row.get("pass_type")),
                     row.get("category"),
                     user_id,
                 ],
             )
+            inserted += 1
 
         self._commit()
         self.invalidate_cache(rider_id)
-        return len(new_rows)
+        return inserted
 
     def save_data(self, rider_id: str, df: pd.DataFrame, user_id: Optional[str] = None) -> None:
         """
@@ -595,6 +601,13 @@ class TursoStore:
         # Return the combined dataset
         print(f"  Loading updated data...", file=sys.stderr)
         return self.load_data(rider_id)
+
+    def list_riders(self) -> list[str]:
+        """Get distinct rider IDs from the database."""
+        result = self._execute(
+            "SELECT DISTINCT rider_id FROM trips ORDER BY rider_id"
+        )
+        return [row[0] for row in result.fetchall()]
 
     def invalidate_cache(self, rider_id: Optional[str] = None) -> None:
         """Clear the cache for a specific rider or all riders."""
