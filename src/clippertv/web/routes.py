@@ -78,6 +78,9 @@ def _load_rider_df(store, rider: str) -> pd.DataFrame:
         return pd.DataFrame(columns=[
             "Transaction Date", "Category", "Fare",
         ])
+    for df in frames:
+        if "Fare" in df.columns:
+            df["Fare"] = pd.to_numeric(df["Fare"], errors="coerce")
     return pd.concat(frames, ignore_index=True)
 
 
