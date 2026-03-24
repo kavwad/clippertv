@@ -146,7 +146,7 @@ class UserStore:
 
     def add_clipper_card(
         self, user_id: str, card_data: ClipperCardCreate
-    ) -> ClipperCard:
+    ) -> Optional[ClipperCard]:
         """
         Associate Clipper card with user account.
 

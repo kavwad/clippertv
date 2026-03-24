@@ -75,9 +75,11 @@ def parse_csv(csv_content: str) -> pd.DataFrame:
         )
 
     def _parse_location(series: pd.Series) -> pd.Series:
-        return series.apply(
+        result = series.apply(
             lambda v: None if (v is None or str(v).strip() in _NA_VALUES) else str(v).strip()
         )
+        assert isinstance(result, pd.Series)
+        return result
 
     df = pd.DataFrame()
     df["account_number"] = raw["ACCOUNT NUMBER"].str.strip()
@@ -106,7 +108,7 @@ def find_csrf_token(html_text: str) -> str:
     token = soup.find("input", attrs={"name": "_csrf"})
     if not token or not token.get("value"):
         raise RuntimeError("CSRF token not found in HTML")
-    return token["value"]
+    return str(token["value"])
 
 
 def login(session: requests.Session, email: str, password: str) -> requests.Session:
@@ -137,7 +139,7 @@ def login(session: requests.Session, email: str, password: str) -> requests.Sess
     if resp2.status_code not in (200, 302):
         raise RuntimeError(f"Could not login: {resp2.status_code}")
 
-    session.csrf_token = find_csrf_token(resp2.text)
+    setattr(session, "csrf_token", find_csrf_token(resp2.text))
     return session
 
 

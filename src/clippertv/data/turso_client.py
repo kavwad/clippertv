@@ -37,7 +37,7 @@ def _create_turso_client():
         )
 
     # Connect directly to remote (simpler, no cache issues)
-    return libsql.connect(db_url, auth_token=auth_token)
+    return libsql.connect(db_url, auth_token=auth_token)  # ty: ignore[unresolved-attribute]
 
 
 def get_turso_client():

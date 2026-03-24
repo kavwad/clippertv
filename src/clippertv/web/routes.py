@@ -90,8 +90,8 @@ async def dashboard(request: Request, rider: str = ""):
     store = get_store()
     riders = get_riders(store)
     if not riders:
-        return templates.TemplateResponse("dashboard.html", {
-            "request": request, "rider": None, "riders": [],
+        return templates.TemplateResponse(request, "dashboard.html", {
+            "rider": None, "riders": [],
             "stats": None, "pivot_month": None, "pivot_year": None,
             "pivot_year_cost": None, "color_map": config.transit_categories.color_map,
         })
@@ -104,9 +104,9 @@ async def dashboard(request: Request, rider: str = ""):
     stats = calculate_summary_stats(pivot_month, pivot_month_cost, df)
 
     return templates.TemplateResponse(
+        request,
         "dashboard.html",
         {
-            "request": request,
             "rider": rider,
             "riders": riders,
             "stats": stats,
@@ -114,7 +114,7 @@ async def dashboard(request: Request, rider: str = ""):
             "pivot_year": pivot_year,
             "pivot_year_cost": pivot_year_cost,
             "color_map": config.transit_categories.color_map,
-        }
+        },
     )
 
 
@@ -199,7 +199,7 @@ async def get_comparison_data():
         if latest_date is None or rider_last > latest_date:
             latest_date = rider_last
 
-    if start_date is None:
+    if start_date is None or latest_date is None:
         return {"labels": [], "datasets": []}
 
     start_date = start_date.to_period("M").to_timestamp(how="start")
@@ -228,7 +228,7 @@ async def get_comparison_data():
             .unstack(fill_value=0)
         )
         total = pivot.sum(axis=1)
-        total.index = total.index.to_period("M").to_timestamp(how="start")
+        total.index = total.index.to_period("M").to_timestamp(how="start")  # ty: ignore[unresolved-attribute]
         total = total.reindex(complete_index, fill_value=0)
 
         datasets.append({
@@ -261,7 +261,7 @@ async def get_table_data(rider: str):
                 label = idx.strftime("%b %Y")
             else:
                 label = str(idx)
-            record = {"label": label}
+            record: dict[str, str | int] = {"label": label}
             for col in pivot.columns:
                 val = row[col]
                 if is_cost:

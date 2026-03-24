@@ -35,11 +35,13 @@ def create_pivot_year(df: pd.DataFrame) -> pd.DataFrame:
 
 def create_pivot_month(df: pd.DataFrame) -> pd.DataFrame:
     """Create monthly pivot table of trips by category."""
-    pivot = (
+    unstacked = (
         df.groupby([pd.Grouper(key="Transaction Date", freq="ME"), "Category"])
         .size()
         .unstack(fill_value=0)
     )
+    assert isinstance(unstacked, pd.DataFrame)
+    pivot = unstacked
     pivot.sort_index(ascending=False, inplace=True)
     pivot.index.name = "Month"
     return _reorder_columns(pivot).astype(int)
