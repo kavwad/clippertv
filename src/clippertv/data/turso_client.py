@@ -23,32 +23,20 @@ def _create_turso_client():
             "Install it with: uv add libsql"
         )
 
-    # Get configuration from environment variables or Streamlit secrets
+    # Get configuration from environment variables
     db_url = os.environ.get("TURSO_DATABASE_URL")
     auth_token = os.environ.get("TURSO_AUTH_TOKEN")
-
-    # Try Streamlit secrets as fallback
-    if not db_url or not auth_token:
-        try:
-            import streamlit as st
-            connection_settings = (
-                st.secrets.get("connections", {}).get("turso", {})
-            )
-            db_url = db_url or connection_settings.get("database_url")
-            auth_token = auth_token or connection_settings.get("auth_token")
-        except (ImportError, FileNotFoundError, AttributeError):
-            pass
 
     if not db_url:
         raise ValueError(
             "TURSO_DATABASE_URL not set. "
-            "Set it via environment variable or Streamlit secrets."
+            "Set it via the TURSO_DATABASE_URL environment variable."
         )
 
     if not auth_token:
         raise ValueError(
             "TURSO_AUTH_TOKEN not set. "
-            "Set it via environment variable or Streamlit secrets."
+            "Set it via the TURSO_AUTH_TOKEN environment variable."
         )
 
     # Connect directly to remote (simpler, no cache issues)

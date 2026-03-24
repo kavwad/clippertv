@@ -1,25 +1,19 @@
 [project]
 name = "clippertv"
-version = "0.1.0"
+version = "0.2.0"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "bs4>=0.0.2",
-    "camelot-py>=1.0.0",
-    "pandas>=2.0.0",
     "pydantic[email]>=2.6.0",
     "requests>=2.32.0",
     "libsql>=0.1.11",
     "pyjwt>=2.10.1",
     "bcrypt>=5.0.0",
     "cryptography>=46.0.3",
-    "plotly>=6.3.1",
-    "python-multipart>=0.0.20",
+    "pandas>=2.0.0",
 ]
 
 [project.optional-dependencies]
-dashboard = [
-    "streamlit>=1.50.0",
-]
 web = [
     "fastapi>=0.115.0",
     "jinja2>=3.1.0",
@@ -27,8 +21,8 @@ web = [
 ]
 
 [project.scripts]
-clippertv = "clippertv.app:main"
 clippertv-web = "clippertv.web.main:run"
+clipper-download = "clippertv.ingest.clipper:main"
 
 [build-system]
 requires = ["setuptools>=61.0"]
@@ -36,7 +30,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-packages = ["clippertv", "clippertv.ingest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [dependency-groups]
 dev = [
