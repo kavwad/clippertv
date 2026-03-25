@@ -169,3 +169,20 @@ def load_rider_mapping(config_path: str = "clipper.toml") -> Dict[str, str]:
             for val in account.get(key, []):
                 mapping[val] = name
     return mapping
+
+
+def load_account_mapping(config_path: str = "clipper.toml") -> Dict[str, List[str]]:
+    """Build display name → account numbers mapping from clipper.toml.
+
+    Returns a dict like {"kaveh": ["100005510894", "100005510902"], ...}.
+    """
+    path = Path(config_path)
+    if not path.exists():
+        return {}
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+    mapping: Dict[str, List[str]] = {}
+    for account in data.get("accounts", []):
+        name = account["name"]
+        mapping[name] = list(account.get("accounts", []))
+    return mapping

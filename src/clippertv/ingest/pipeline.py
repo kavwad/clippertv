@@ -1,7 +1,7 @@
 """Source-agnostic ingestion pipeline.
 
-Takes a normalized DataFrame (from any source), categorizes transactions,
-and stores them via TursoStore.
+Takes a normalized DataFrame (from any source) and stores via TursoStore.
+Category derivation happens at query time via category_rules table.
 """
 
 from __future__ import annotations
@@ -9,8 +9,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pandas as pd
-
-from clippertv.ingest.categories import categorize
 
 if TYPE_CHECKING:
     from clippertv.data.turso_store import TursoStore
@@ -22,11 +20,11 @@ def ingest(
     user_id: str | None,
     store: TursoStore,
 ) -> int:
-    """Categorize, dedup, and store transactions.
+    """Dedup and store transactions.
 
     Args:
         df: Normalized DataFrame with columns from CSV parsing.
-        rider_id: Rider identifier (from card-to-user lookup).
+        rider_id: Account number (from card-to-user lookup).
         user_id: User ID (from card-to-user lookup).
         store: TursoStore instance.
 
@@ -36,5 +34,4 @@ def ingest(
     if df.empty:
         return 0
 
-    df = categorize(df)
     return store.save_csv_transactions(rider_id, df, user_id=user_id)
