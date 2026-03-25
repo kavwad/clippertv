@@ -1,5 +1,6 @@
 """Configuration management for ClipperTV."""
 
+import hashlib
 import os
 import tomllib
 from pathlib import Path
@@ -8,30 +9,59 @@ from typing import Dict, List, Optional
 from pydantic import BaseModel
 
 
+def _hash_color(name: str) -> str:
+    """Generate a deterministic, visually distinct color from a string."""
+    h = int(hashlib.sha256(name.encode()).hexdigest()[:8], 16)
+    hue = h % 360
+    saturation = 45 + (h >> 12) % 25  # 45-69%
+    lightness = 35 + (h >> 20) % 20  # 35-54%
+    return _hsl_to_hex(hue, saturation, lightness)
+
+
+def _hsl_to_hex(h: int, s: int, l: int) -> str:  # noqa: E741
+    """Convert HSL (0-360, 0-100, 0-100) to hex color string."""
+    s_f, l_f = s / 100, l / 100
+    c = (1 - abs(2 * l_f - 1)) * s_f
+    x = c * (1 - abs((h / 60) % 2 - 1))
+    m = l_f - c / 2
+    if h < 60:
+        r, g, b = c, x, 0
+    elif h < 120:
+        r, g, b = x, c, 0
+    elif h < 180:
+        r, g, b = 0, c, x
+    elif h < 240:
+        r, g, b = 0, x, c
+    elif h < 300:
+        r, g, b = x, 0, c
+    else:
+        r, g, b = c, 0, x
+    return "#{:02X}{:02X}{:02X}".format(
+        int((r + m) * 255), int((g + m) * 255), int((b + m) * 255),
+    )
+
+
 class TransitCategories(BaseModel):
     """Transit category display configuration."""
-
-    display_categories: List[str] = [
-        "Muni Bus", "Muni Metro", "BART", "Cable Car",
-        "Caltrain", "Ferry", "AC Transit", "SamTrans",
-    ]
 
     color_map: Dict[str, str] = {
         "Muni Bus": "#BA0C2F",
         "Muni Metro": "#FDB813",
-        "BART": "#0099CC",
+        "BART": "#0099D8",
         "Cable Car": "#8B4513",
         "Caltrain": "#6C6C6C",
-        "AC Transit": "#00A55E",
         "Ferry": "#4DD0E1",
+        "AC Transit": "#006B54",
         "SamTrans": "#D3D3D3",
+        "VTA": "#29588C",
+        "Golden Gate Transit": "#F04A00",
+        "Unknown": "#888888",
+        "Other": "#888888",
     }
 
-    fallback_color: str = "#888888"
-
     def get_color(self, category: str) -> str:
-        """Get color for a category, with fallback for unknown ones."""
-        return self.color_map.get(category, self.fallback_color)
+        """Get color for a category, hashing unknown names as fallback."""
+        return self.color_map.get(category, _hash_color(category))
 
 
 class AppConfig(BaseModel):
@@ -108,6 +138,18 @@ class EnvConfig:
 
 
 env_config = EnvConfig()
+
+
+def load_display_categories(config_path: str = "clipper.toml") -> Optional[List[str]]:
+    """Load explicit display categories from clipper.toml, if configured."""
+    path = Path(config_path)
+    if not path.exists():
+        return None
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+    display = data.get("display", {})
+    cats = display.get("categories")
+    return list(cats) if cats else None
 
 
 def load_rider_mapping(config_path: str = "clipper.toml") -> Dict[str, str]:

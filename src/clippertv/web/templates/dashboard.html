@@ -111,7 +111,15 @@
                 }
             },
             tooltip: {
-                callbacks: {}
+                yAlign: 'bottom',
+                caretPadding: 32,
+                filter: item => item.raw !== 0,
+                callbacks: {
+                    footer: items => {
+                        const total = items.reduce((sum, item) => sum + item.raw, 0);
+                        return `Total: ${total}`;
+                    }
+                }
             }
         },
         scales: {
@@ -169,8 +177,15 @@
                             font: { size: 16, weight: 'normal' }
                         },
                         tooltip: {
+                            yAlign: 'bottom',
+                caretPadding: 32,
+                            filter: item => item.raw !== 0,
                             callbacks: {
-                                label: ctx => `${ctx.dataset.label}: $${ctx.raw.toFixed(2)}`
+                                label: ctx => `${ctx.dataset.label}: $${Math.round(ctx.raw)}`,
+                                footer: items => {
+                                    const total = items.reduce((sum, item) => sum + item.raw, 0);
+                                    return `Total: $${Math.round(total)}`;
+                                }
                             }
                         }
                     },

@@ -7,19 +7,48 @@ Expects the unified DataFrame format from TursoStore.load_data():
 - Plus optional: Start Location, End Location, Operator, etc.
 """
 
+from typing import List, Optional
+
 import pandas as pd
 
-from ..config import config
+from ..config import load_display_categories
+
+DEFAULT_MAX_CATEGORIES = 8
 
 
-def _reorder_columns(pivot: pd.DataFrame, fill_value=0) -> pd.DataFrame:
-    """Reorder pivot columns: known display categories first, then extras."""
-    known = [c for c in config.transit_categories.display_categories if c in pivot.columns]
-    extra = [c for c in pivot.columns if c not in known and c != "Reload"]
-    return pivot.reindex(columns=known + extra, fill_value=fill_value)
+def _top_categories(pivot: pd.DataFrame, max_categories: int) -> List[str]:
+    """Return the top N categories by total value across all rows."""
+    totals = pivot.sum(axis=0)
+    totals = totals.drop(["Reload", "Unknown"], errors="ignore")
+    return totals.nlargest(max_categories).index.tolist()
 
 
-def create_pivot_year(df: pd.DataFrame) -> pd.DataFrame:
+def _collapse_categories(
+    pivot: pd.DataFrame,
+    keep: Optional[List[str]] = None,
+    max_categories: int = DEFAULT_MAX_CATEGORIES,
+    fill_value=0,
+) -> pd.DataFrame:
+    """Keep top categories, fold the rest into 'Other'.
+
+    If `keep` is provided (from clipper.toml), use that list exactly.
+    Otherwise, pick the top `max_categories` by total volume.
+    """
+    if keep is None:
+        keep = _top_categories(pivot, max_categories)
+    # keep list defines the order (TOML explicit, or by volume from _top_categories)
+    ordered = [c for c in keep if c in pivot.columns]
+
+    other_cols = [c for c in pivot.columns if c not in ordered and c != "Reload"]
+    result = pivot.reindex(columns=ordered, fill_value=fill_value).copy()
+    if other_cols:
+        result["Other"] = pivot[other_cols].sum(axis=1)
+    return result
+
+
+def create_pivot_year(
+    df: pd.DataFrame, keep: Optional[List[str]] = None,
+) -> pd.DataFrame:
     """Create yearly pivot table of trips by category."""
     pivot = df.pivot_table(
         index=df["Transaction Date"].dt.year,
@@ -30,10 +59,22 @@ def create_pivot_year(df: pd.DataFrame) -> pd.DataFrame:
     )
     pivot.sort_index(ascending=False, inplace=True)
     pivot.index.name = "Year"
-    return _reorder_columns(pivot).astype(int)
+    return _collapse_categories(pivot, keep=keep).astype(int)
 
 
-def create_pivot_month(df: pd.DataFrame) -> pd.DataFrame:
+def _complete_month_index(pivot: pd.DataFrame) -> pd.DataFrame:
+    """Reindex a month-indexed pivot to include all months in the range."""
+    if pivot.empty:
+        return pivot
+    full_range = pd.date_range(
+        start=pivot.index.min(), end=pivot.index.max(), freq="ME",
+    )
+    return pivot.reindex(full_range, fill_value=0)
+
+
+def create_pivot_month(
+    df: pd.DataFrame, keep: Optional[List[str]] = None,
+) -> pd.DataFrame:
     """Create monthly pivot table of trips by category."""
     unstacked = (
         df.groupby([pd.Grouper(key="Transaction Date", freq="ME"), "Category"])
@@ -41,13 +82,15 @@ def create_pivot_month(df: pd.DataFrame) -> pd.DataFrame:
         .unstack(fill_value=0)
     )
     assert isinstance(unstacked, pd.DataFrame)
-    pivot = unstacked
+    pivot = _complete_month_index(unstacked)
     pivot.sort_index(ascending=False, inplace=True)
     pivot.index.name = "Month"
-    return _reorder_columns(pivot).astype(int)
+    return _collapse_categories(pivot, keep=keep).astype(int)
 
 
-def create_pivot_year_cost(df: pd.DataFrame) -> pd.DataFrame:
+def create_pivot_year_cost(
+    df: pd.DataFrame, keep: Optional[List[str]] = None,
+) -> pd.DataFrame:
     """Create yearly pivot table of costs by category."""
     pivot = df.pivot_table(
         index=df["Transaction Date"].dt.year,
@@ -58,27 +101,44 @@ def create_pivot_year_cost(df: pd.DataFrame) -> pd.DataFrame:
     )
     pivot.sort_index(ascending=False, inplace=True)
     pivot.index.name = "Year"
-    return _reorder_columns(pivot)
+    return _collapse_categories(pivot, keep=keep)
 
 
-def create_pivot_month_cost(df: pd.DataFrame) -> pd.DataFrame:
+def create_pivot_month_cost(
+    df: pd.DataFrame, keep: Optional[List[str]] = None,
+) -> pd.DataFrame:
     """Create monthly pivot table of costs by category."""
     pivot = (
         df.groupby([pd.Grouper(key="Transaction Date", freq="ME"), "Category"])["Fare"]
         .sum()
         .unstack(fill_value=0)
     )
+    pivot = _complete_month_index(pivot)
     pivot.sort_index(ascending=False, inplace=True)
     pivot.index.name = "Month"
-    return _reorder_columns(pivot)
+    return _collapse_categories(pivot, keep=keep)
 
 
 def process_data(df: pd.DataFrame):
     """Process data into pivot tables for display."""
-    pivot_year = create_pivot_year(df)
-    pivot_month = create_pivot_month(df)
-    pivot_year_cost = create_pivot_year_cost(df)
-    pivot_month_cost = create_pivot_month_cost(df)
+    toml_override = load_display_categories()
+
+    # Determine which categories to keep: TOML override, or top N by trip count
+    if toml_override is not None:
+        keep = toml_override
+    else:
+        raw_month = (
+            df.groupby([pd.Grouper(key="Transaction Date", freq="ME"), "Category"])
+            .size()
+            .unstack(fill_value=0)
+        )
+        assert isinstance(raw_month, pd.DataFrame)
+        keep = _top_categories(raw_month, DEFAULT_MAX_CATEGORIES)
+
+    pivot_year = create_pivot_year(df, keep=keep)
+    pivot_month = create_pivot_month(df, keep=keep)
+    pivot_year_cost = create_pivot_year_cost(df, keep=keep)
+    pivot_month_cost = create_pivot_month_cost(df, keep=keep)
 
     free_xfers = (df["Fare"] == 0).sum()
 
