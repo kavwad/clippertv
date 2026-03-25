@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 
 from clippertv.viz.data_processing import (
+    apply_pass_costs,
     calculate_summary_stats,
     create_pivot_month,
     create_pivot_month_cost,
@@ -65,3 +66,48 @@ def test_summary_stats_basic():
     stats = calculate_summary_stats(pivot_month, pivot_month_cost, df)
     assert stats["trips_this_month"] == 2
     assert stats["cost_this_month"] == 8
+
+
+def _make_pass_df() -> pd.DataFrame:
+    """Build a DataFrame mimicking CSV-sourced Caltrain pass + cash rides."""
+    rows = [
+        # Oct 2023: pass ride (fare=0, Pass Type set)
+        {"Transaction Date": pd.Timestamp("2023-10-02"), "Category": "Caltrain",
+         "Fare": 0.0, "Pass Type": "Caltrain Adult 3 Zone Monthly"},
+        # Oct 2023: one BART ride (unaffected)
+        {"Transaction Date": pd.Timestamp("2023-10-05"), "Category": "BART",
+         "Fare": 5.35, "Pass Type": None},
+        # Nov 2023: Caltrain ride paid with cash (no pass)
+        {"Transaction Date": pd.Timestamp("2023-11-07"), "Category": "Caltrain",
+         "Fare": 7.70, "Pass Type": None},
+    ]
+    return pd.DataFrame(rows)
+
+
+def test_apply_pass_costs_replaces_fare_in_pass_months():
+    df = _make_pass_df()
+    result = apply_pass_costs(df)
+    # Oct 2023 Caltrain fares should be zeroed, replaced by $184.80 pass
+    oct_caltrain = result[
+        (result["Category"] == "Caltrain")
+        & (result["Transaction Date"].dt.month == 10)
+    ]
+    assert oct_caltrain["Fare"].sum() == pytest.approx(184.80)
+
+
+def test_apply_pass_costs_leaves_cash_months_alone():
+    df = _make_pass_df()
+    result = apply_pass_costs(df)
+    # Nov 2023 Caltrain ride is not a pass month → fare unchanged
+    nov_caltrain = result[
+        (result["Category"] == "Caltrain")
+        & (result["Transaction Date"].dt.month == 11)
+    ]
+    assert nov_caltrain["Fare"].sum() == pytest.approx(7.70)
+
+
+def test_apply_pass_costs_leaves_other_categories_alone():
+    df = _make_pass_df()
+    result = apply_pass_costs(df)
+    bart = result[result["Category"] == "BART"]
+    assert bart["Fare"].sum() == pytest.approx(5.35)

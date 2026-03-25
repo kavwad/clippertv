@@ -16,6 +16,50 @@ from ..config import load_display_categories
 DEFAULT_MAX_CATEGORIES = 8
 
 
+CALTRAIN_MONTHLY_PASS_COST = 184.80
+
+
+def apply_pass_costs(df: pd.DataFrame) -> pd.DataFrame:
+    """Inject monthly pass cost for months with at least one pass ride.
+
+    Detects pass months via the ``Pass Type`` column (set by the CSV export
+    for rides covered by a monthly pass, where ``Fare`` is already 0).
+    For each such month, zeroes out any remaining per-ride Caltrain fares
+    (e.g. from duplicate manual/PDF rows) and injects a single row carrying
+    the flat pass cost.
+
+    Only affects Fare values — the returned DataFrame should be used for cost
+    pivots, not trip-count pivots.
+    """
+    if "Pass Type" not in df.columns:
+        return df
+
+    pass_type = df["Pass Type"].fillna("")
+    is_pass_ride = pass_type.str.contains("Monthly", case=False)
+
+    if not is_pass_ride.any():
+        return df
+
+    # Identify months with at least one pass ride
+    pass_months = set(df.loc[is_pass_ride, "Transaction Date"].dt.to_period("M"))
+
+    cost_df = df.copy()
+    is_caltrain = cost_df["Category"] == "Caltrain"
+    in_pass_month = cost_df["Transaction Date"].dt.to_period("M").isin(pass_months)
+
+    # Zero out per-ride fares in pass months (CSV rows are already 0,
+    # but duplicate manual/PDF rows may carry stale fare values)
+    cost_df.loc[is_caltrain & in_pass_month, "Fare"] = 0.0
+
+    # Inject one row per pass month carrying the flat pass cost
+    pass_rows = pd.DataFrame([
+        {"Transaction Date": m.to_timestamp(), "Category": "Caltrain",
+         "Fare": CALTRAIN_MONTHLY_PASS_COST}
+        for m in sorted(pass_months)
+    ])
+    return pd.concat([cost_df, pass_rows], ignore_index=True)
+
+
 def _top_categories(pivot: pd.DataFrame, max_categories: int) -> List[str]:
     """Return the top N categories by total value across all rows."""
     totals = pivot.sum(axis=0)
@@ -137,8 +181,10 @@ def process_data(df: pd.DataFrame):
 
     pivot_year = create_pivot_year(df, keep=keep)
     pivot_month = create_pivot_month(df, keep=keep)
-    pivot_year_cost = create_pivot_year_cost(df, keep=keep)
-    pivot_month_cost = create_pivot_month_cost(df, keep=keep)
+
+    cost_df = apply_pass_costs(df)
+    pivot_year_cost = create_pivot_year_cost(cost_df, keep=keep)
+    pivot_month_cost = create_pivot_month_cost(cost_df, keep=keep)
 
     free_xfers = (df["Fare"] == 0).sum()
 
@@ -176,5 +222,5 @@ def calculate_summary_stats(
         "cost_diff_text": "less" if cost_diff >= 0 else "more",
         "most_recent_date": most_recent_date,
         "most_used_mode": current_month_trips.idxmax(),
-        "pass_upshot": None,  # Legacy — Caltrain pass logic deferred
+        "pass_upshot": None,
     }

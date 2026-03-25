@@ -10,6 +10,7 @@ from fastapi.templating import Jinja2Templates
 from clippertv.config import config, load_rider_mapping
 from clippertv.data.factory import get_data_store
 from clippertv.viz.data_processing import (
+    apply_pass_costs,
     process_data,
     calculate_summary_stats,
     create_pivot_month,
@@ -151,7 +152,7 @@ async def get_cost_data(rider: str):
     """Return cost chart data as JSON for Chart.js."""
     store = get_store()
     df = _load_rider_df(store, rider)
-    pivot_month_cost = create_pivot_month_cost(df)
+    pivot_month_cost = create_pivot_month_cost(apply_pass_costs(df))
 
     # Sort chronologically for chart (oldest first)
     pivot_month_cost = pivot_month_cost.sort_index(ascending=True)
