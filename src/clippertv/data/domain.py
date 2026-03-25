@@ -26,7 +26,7 @@ class AggregateBucket:
     period: str        # "2026-03", "2026", etc.
     category: str
     count: int
-    total_fare: float  # 0.0 when all fares are NULL (via COALESCE in SQL)
+    total_fare: float
 
 
 @dataclass(frozen=True)

@@ -13,8 +13,9 @@ clipper-download --last-month --ingest
 uv run pytest                        # All tests
 uv run pytest -k test_name           # Specific test
 
-# DB migration
-uv run python migrations/run_migration.py
+# DB migration (v2 schema)
+uv run python migrations/schema_v2.py          # dry run
+uv run python migrations/schema_v2.py --swap   # destructive swap
 ```
 
 ## Dependencies
@@ -32,31 +33,36 @@ uv run python migrations/run_migration.py
 
 ### Ingestion (`src/clippertv/ingest/`)
 - `clipper.py` - CSV downloader and CLI entry point (`clipper-download`)
-- `pipeline.py` - Orchestrates parsing, categorization, and DB storage
-- `categories.py` - Operator-based transit category detection
+- `pipeline.py` - Thin orchestrator: parse CSV → store (no category derivation)
 
 ### Data Layer (`src/clippertv/data/`)
+- `domain.py` - Typed dataclasses (Trip, AggregateBucket, RiderSummary, ComparisonPoint)
+- `schema.py` - V2 table DDL (trips, manual_trips, category_rules) and seed data
+- `queries.py` - SQL query layer with category_rules JOIN, returns typed objects
+- `turso_store.py` - CSV transaction storage with trip_id dedup
+- `turso_client.py` - Database connection management
 - `models.py` - Pydantic models (User, ClipperCard, AuthToken)
-- `turso_store.py` - Transaction storage with trip_id dedup and load-time normalization
 - `user_store.py` - User/ClipperCard CRUD operations
-- `turso_client.py` - Database connection management and schema migrations
-- `factory.py` - Data store factory
+
+### Analytics (`src/clippertv/analytics/`)
+- `pass_costs.py` - Caltrain monthly pass cost injection
+- `categories.py` - Category collapsing (top N / "Other")
+- `comparison.py` - Cross-rider month alignment
+- `summary.py` - Dashboard summary stats
 
 ### Authentication (`src/clippertv/auth/`)
 - `service.py` - AuthService (JWT tokens, password hashing with bcrypt)
 - `crypto.py` - CredentialEncryption (Fernet encryption for Clipper credentials)
 
-### Visualization (`src/clippertv/viz/`)
-- `data_processing.py` - Pivot tables and summary stats for the dashboard
-
 ### Web UI (`src/clippertv/web/`)
 - `main.py` - FastAPI app entry point
-- `routes.py` - Dashboard and API endpoints (dynamic rider list from DB)
+- `routes.py` - Dashboard and API endpoints (uses queries + analytics, no pandas)
 - `templates/` - Jinja2 templates with Chart.js
 
 ### Configuration (`src/clippertv/config.py`)
 - `AppConfig` - App settings (transit categories, colors)
 - `EnvConfig` - Environment variables (DB, JWT, encryption keys)
+- `load_account_mapping()` - Display name → account numbers from clipper.toml
 
 ### Key Environment Variables
 Required in `.env`:
@@ -73,8 +79,9 @@ Required in `.env`:
 - **Line length**: Max 88 characters
 
 ## Testing
-- Ingest: `tests/ingest/` (categories, CSV parsing, pipeline)
+- Data: `tests/data/` (schema, queries)
+- Analytics: `tests/analytics/` (pass costs, categories, comparison, summary)
+- Ingest: `tests/ingest/` (CSV parsing, pipeline)
 - Auth: `tests/test_auth.py`
 - User store: `tests/test_user_store.py`
-- Dashboard: `tests/viz/test_dashboard.py`
 - Use pytest fixtures for DB client, auth service, crypto

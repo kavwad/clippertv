@@ -18,12 +18,12 @@
 <div class="stats">
     <p>
         <strong>{{ rider }}</strong> took <span class="highlight">{{ stats.trips_this_month }}</span> trips in
-        {{ stats.most_recent_date.strftime('%B') }}, which cost
+        {{ stats.most_recent_month }}, which cost
         <span class="highlight">${{ stats.cost_this_month }}</span>.
     </p>
     <p>
         {{ rider }} rode <strong>{{ stats.most_used_mode }}</strong> most, at
-        <strong>{{ pivot_month.iloc[0][stats.most_used_mode] }}</strong> times.
+        <strong>{{ most_used_count }}</strong> times.
         Altogether, {{ rider }} took {{ stats.trip_diff|abs }} {{ stats.trip_diff_text }}
         trips and paid ${{ stats.cost_diff|abs }} {{ stats.cost_diff_text }}
         than the previous month.
@@ -37,10 +37,10 @@
         <p>This month, {{ rider }} broke even with a Caltrain pass.</p>
         {% endif %}
     {% endif %}
-    {% if stats.most_recent_date.strftime('%B') != 'January' %}
+    {% if not stats.most_recent_month_is_january %}
     <p>
-        This year, {{ rider }} has taken <strong>{{ pivot_year.iloc[0].sum() }}</strong> trips,
-        costing <strong>${{ pivot_year_cost.iloc[0].sum()|round|int }}</strong>.
+        This year, {{ rider }} has taken <strong>{{ yearly_trip_total }}</strong> trips,
+        costing <strong>${{ yearly_cost_total }}</strong>.
     </p>
     {% endif %}
 </div>

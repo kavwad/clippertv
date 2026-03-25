@@ -1,119 +1,157 @@
 """FastAPI routes for ClipperTV dashboard."""
 
+from __future__ import annotations
+
+import dataclasses
+from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 
-import pandas as pd
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from clippertv.config import config, load_rider_mapping
-from clippertv.data.factory import get_data_store
-from clippertv.viz.data_processing import (
-    apply_pass_costs,
-    process_data,
-    calculate_summary_stats,
-    create_pivot_month,
-    create_pivot_month_cost,
-)
+from clippertv.analytics.categories import collapse_categories
+from clippertv.analytics.comparison import align_riders
+from clippertv.analytics.pass_costs import apply_pass_costs
+from clippertv.analytics.summary import compute_summary
+from clippertv.config import config, load_account_mapping, load_display_categories
+from clippertv.data.domain import AggregateBucket
+from clippertv.data.queries import QueryLayer
+from clippertv.data.turso_client import get_turso_client, initialize_database
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
-# Cache data store
-_data_store = None
-
 RIDER_COLORS = ["#0099CC", "#00A55E", "#FDB813", "#BA0C2F", "#6C6C6C", "#4DD0E1"]
 
-# rider_id → display name mapping (from clipper.toml)
-_rider_map = load_rider_mapping()
+_account_map: dict[str, list[str]] | None = None
+_display_categories: list[str] | None | bool = False  # False = not loaded
+_ql: QueryLayer | None = None
 
 
-def _display_name(rider_id: str) -> str:
-    """Resolve a rider_id to a capitalized display name."""
-    name = _rider_map.get(rider_id, rider_id)
+def _get_ql() -> QueryLayer:
+    global _ql
+    if _ql is None:
+        initialize_database()
+        _ql = QueryLayer(get_turso_client())
+    return _ql
+
+
+def _get_account_map() -> dict[str, list[str]]:
+    global _account_map
+    if _account_map is None:
+        _account_map = load_account_mapping()
+    return _account_map
+
+
+def _accounts_for(rider: str) -> list[str]:
+    """Resolve display name to account numbers."""
+    acct_map = _get_account_map()
+    return acct_map.get(rider.lower(), acct_map.get(rider, [rider]))
+
+
+def _display_name(name: str) -> str:
+    """Capitalize a rider name for display."""
     return name.capitalize() if name.isalpha() else name
 
 
-def _rider_ids_for(display_name: str) -> list[str]:
-    """Get all rider_ids that map to a given display name."""
-    lower = display_name.lower()
-    return [rid for rid, name in _rider_map.items() if name.lower() == lower]
+def get_riders() -> list[str]:
+    """Get rider display names from config."""
+    return [_display_name(n) for n in _get_account_map()]
 
 
-def get_store():
-    """Get cached data store instance."""
-    global _data_store
-    if _data_store is None:
-        _data_store = get_data_store()
-    return _data_store
-
-
-def get_riders(store) -> list[str]:
-    """Get deduplicated display names for all riders in the database."""
-    raw_ids = store.list_riders()
-    seen = {}
-    for rid in raw_ids:
-        name = _display_name(rid)
-        if name not in seen:
-            seen[name] = rid
-    return list(seen.keys())
-
-
-def _load_rider_df(store, rider: str) -> pd.DataFrame:
-    """Load and concatenate data for all rider_ids behind a display name."""
-    raw_ids = _rider_ids_for(rider)
-    # Also include the display name itself in case it's used directly as a rider_id
-    if rider not in raw_ids:
-        raw_ids.append(rider)
-    # Only query IDs that actually exist in the DB
-    db_ids = set(store.list_riders())
-    query_ids = [rid for rid in raw_ids if rid in db_ids]
-    if not query_ids:
-        return pd.DataFrame(columns=[
-            "Transaction Date", "Category", "Fare",
-        ])
-    data = store.load_multiple_riders(query_ids)
-    frames = [df for df in data.values() if not df.empty]
-    if not frames:
-        return pd.DataFrame(columns=[
-            "Transaction Date", "Category", "Fare",
-        ])
-    for df in frames:
-        if "Fare" in df.columns:
-            df["Fare"] = pd.to_numeric(df["Fare"], errors="coerce")
-    return pd.concat(frames, ignore_index=True)
+def _keep_categories() -> list[str] | None:
+    global _display_categories
+    if _display_categories is False:
+        _display_categories = load_display_categories()
+    return _display_categories
 
 
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request, rider: str = ""):
     """Render the main dashboard page."""
-    store = get_store()
-    riders = get_riders(store)
+    riders = get_riders()
     if not riders:
         return templates.TemplateResponse(request, "dashboard.html", {
-            "rider": None, "riders": [],
-            "stats": None, "pivot_month": None, "pivot_year": None,
-            "pivot_year_cost": None, "color_map": config.transit_categories.color_map,
+            "rider": None, "riders": [], "stats": None,
+            "color_map": config.transit_categories.color_map,
         })
     if rider not in riders:
         rider = riders[0]
 
-    df = _load_rider_df(store, rider)
+    ql = _get_ql()
+    accounts = _accounts_for(rider)
+    keep = _keep_categories()
 
-    pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, free_xfers = process_data(df)
-    stats = calculate_summary_stats(pivot_month, pivot_month_cost, df)
+    monthly = collapse_categories(
+        ql.monthly_by_category(accounts, include_manual=True),
+        keep=keep,
+    )
+
+    # Current and previous month for summary
+    all_periods = sorted({b.period for b in monthly})
+    current_period = all_periods[-1] if all_periods else None
+    prev_period = all_periods[-2] if len(all_periods) > 1 else None
+
+    current_buckets = (
+        [b for b in monthly if b.period == current_period]
+        if current_period
+        else []
+    )
+    prev_buckets = (
+        [b for b in monthly if b.period == prev_period]
+        if prev_period
+        else []
+    )
+    recent_date = ql.most_recent_date(accounts)
+    stats = compute_summary(
+        current_buckets, prev_buckets, most_recent_date=recent_date,
+    )
+
+    most_used_count = 0
+    if current_buckets:
+        top = max(current_buckets, key=lambda b: b.count)
+        most_used_count = top.count
+
+    # Yearly totals — fetch once, derive both trip and cost views
+    raw_yearly = ql.yearly_by_category(accounts, include_manual=True)
+    yearly = collapse_categories(raw_yearly, keep=keep)
+    pass_m = ql.pass_months(accounts)
+    yearly_cost = collapse_categories(
+        apply_pass_costs(raw_yearly, pass_m), keep=keep,
+    )
+
+    recent_dt = (
+        datetime.strptime(recent_date, "%Y-%m-%d") if recent_date else None
+    )
+    year_str = str(recent_dt.year if recent_dt else datetime.now().year)
+
+    yearly_trip_total = sum(
+        b.count for b in yearly if b.period == year_str
+    )
+    yearly_cost_total = round(
+        sum(b.total_fare for b in yearly_cost if b.period == year_str),
+    )
+
+    stats_dict = dataclasses.asdict(stats)
+    stats_dict["pass_upshot"] = None
+
+    if recent_dt:
+        stats_dict["most_recent_month"] = recent_dt.strftime("%B")
+        stats_dict["most_recent_month_is_january"] = recent_dt.month == 1
+    else:
+        stats_dict["most_recent_month"] = ""
+        stats_dict["most_recent_month_is_january"] = False
 
     return templates.TemplateResponse(
-        request,
-        "dashboard.html",
-        {
+        request, "dashboard.html", {
             "rider": rider,
             "riders": riders,
-            "stats": stats,
-            "pivot_month": pivot_month,
-            "pivot_year": pivot_year,
-            "pivot_year_cost": pivot_year_cost,
+            "stats": stats_dict,
+            "most_used_count": most_used_count,
+            "yearly_trip_total": yearly_trip_total,
+            "yearly_cost_total": yearly_cost_total,
             "color_map": config.transit_categories.color_map,
         },
     )
@@ -122,171 +160,164 @@ async def dashboard(request: Request, rider: str = ""):
 @router.get("/api/trips/{rider}")
 async def get_trip_data(rider: str):
     """Return trip chart data as JSON for Chart.js."""
-    store = get_store()
-    df = _load_rider_df(store, rider)
-    pivot_month = create_pivot_month(df)
-
-    # Sort chronologically for chart (oldest first)
-    pivot_month = pivot_month.sort_index(ascending=True)
-
-    # Format for Chart.js stacked bar chart
-    labels = [d.strftime("%b %Y") for d in pivot_month.index]
-    datasets = []
-
-    for category in pivot_month.columns:
-        color = config.transit_categories.get_color(category)
-        datasets.append({
-            "label": category,
-            "data": pivot_month[category].tolist(),
-            "backgroundColor": color,
-        })
-
-    return {
-        "labels": labels,
-        "datasets": datasets,
-    }
+    ql = _get_ql()
+    accounts = _accounts_for(rider)
+    keep = _keep_categories()
+    buckets = collapse_categories(
+        ql.monthly_by_category(accounts, include_manual=True),
+        keep=keep,
+    )
+    return _buckets_to_chartjs(buckets, value="count")
 
 
 @router.get("/api/costs/{rider}")
 async def get_cost_data(rider: str):
     """Return cost chart data as JSON for Chart.js."""
-    store = get_store()
-    df = _load_rider_df(store, rider)
-    pivot_month_cost = create_pivot_month_cost(apply_pass_costs(df))
+    ql = _get_ql()
+    accounts = _accounts_for(rider)
+    keep = _keep_categories()
 
-    # Sort chronologically for chart (oldest first)
-    pivot_month_cost = pivot_month_cost.sort_index(ascending=True)
-
-    # Format for Chart.js stacked bar chart
-    labels = [d.strftime("%b %Y") for d in pivot_month_cost.index]
-    datasets = []
-
-    for category in pivot_month_cost.columns:
-        color = config.transit_categories.get_color(category)
-        datasets.append({
-            "label": category,
-            "data": [round(v, 2) for v in pivot_month_cost[category].tolist()],
-            "backgroundColor": color,
-        })
-
-    return {
-        "labels": labels,
-        "datasets": datasets,
-    }
+    buckets = ql.monthly_by_category(accounts, include_manual=True)
+    pass_m = ql.pass_months(accounts)
+    buckets = apply_pass_costs(buckets, pass_m)
+    buckets = collapse_categories(buckets, keep=keep)
+    return _buckets_to_chartjs(buckets, value="fare")
 
 
 @router.get("/api/comparison")
 async def get_comparison_data():
     """Return comparison chart data as JSON for Chart.js."""
-    store = get_store()
-    riders = get_riders(store)
+    ql = _get_ql()
+    riders = get_riders()
     if not riders:
         return {"labels": [], "datasets": []}
 
-    # Load consolidated data per display name
-    rider_dfs = {name: _load_rider_df(store, name) for name in riders}
+    rider_counts: dict[str, list[tuple[str, int]]] = {}
+    for name in riders:
+        accounts = _accounts_for(name)
+        rider_counts[name] = ql.monthly_trip_counts(accounts)
 
-    # Find date range
-    start_date = None
-    latest_date = None
-
-    for rider, df in rider_dfs.items():
-        if df.empty:
-            continue
-        rider_first = df["Transaction Date"].min()
-        rider_last = df["Transaction Date"].max()
-        if start_date is None or rider_first < start_date:
-            start_date = rider_first
-        if latest_date is None or rider_last > latest_date:
-            latest_date = rider_last
-
-    if start_date is None or latest_date is None:
+    points = align_riders(rider_counts)
+    if not points:
         return {"labels": [], "datasets": []}
 
-    start_date = start_date.to_period("M").to_timestamp(how="start")
-    latest_date = latest_date.to_period("M").to_timestamp(how="end")
-    complete_index = pd.date_range(start=start_date, end=latest_date, freq="MS")
-
-    labels = [d.strftime("%b %Y") for d in complete_index]
-
+    periods = sorted({p.period for p in points})
+    labels = [_format_period(p) for p in periods]
     datasets = []
-    for i, rider in enumerate(riders):
-        df = rider_dfs[rider]
-        color = RIDER_COLORS[i % len(RIDER_COLORS)]
-        if df.empty:
-            datasets.append({
-                "label": rider,
-                "data": [0] * len(complete_index),
-                "borderColor": color,
-                "backgroundColor": color,
-                "fill": False,
-                "tension": 0.3,
-            })
-            continue
-        pivot = (
-            df.groupby([pd.Grouper(key="Transaction Date", freq="ME"), "Category"])
-            .size()
-            .unstack(fill_value=0)
-        )
-        total = pivot.sum(axis=1)
-        total.index = total.index.to_period("M").to_timestamp(how="start")  # ty: ignore[unresolved-attribute]
-        total = total.reindex(complete_index, fill_value=0)
 
+    for i, name in enumerate(riders):
+        color = RIDER_COLORS[i % len(RIDER_COLORS)]
+        rider_points = {
+            p.period: p.count for p in points if p.rider_name == name
+        }
         datasets.append({
-            "label": rider,
-            "data": total.tolist(),
+            "label": name,
+            "data": [rider_points.get(p, 0) for p in periods],
             "borderColor": color,
             "backgroundColor": color,
             "fill": False,
             "tension": 0.3,
         })
 
-    return {
-        "labels": labels,
-        "datasets": datasets,
-    }
+    return {"labels": labels, "datasets": datasets}
 
 
 @router.get("/api/tables/{rider}")
 async def get_table_data(rider: str):
     """Return pivot table data for display."""
-    store = get_store()
-    df = _load_rider_df(store, rider)
+    ql = _get_ql()
+    accounts = _accounts_for(rider)
+    keep = _keep_categories()
+    pass_m = ql.pass_months(accounts)
 
-    pivot_year, pivot_month, pivot_year_cost, pivot_month_cost, _ = process_data(df)
+    raw_monthly = ql.monthly_by_category(accounts, include_manual=True)
+    monthly = collapse_categories(raw_monthly, keep=keep)
+    monthly_cost = collapse_categories(
+        apply_pass_costs(raw_monthly, pass_m), keep=keep,
+    )
 
-    def df_to_records(pivot, is_cost=False):
-        records = []
-        for idx, row in pivot.iterrows():
-            if isinstance(idx, pd.Timestamp):
-                label = idx.strftime("%b %Y")
-            else:
-                label = str(idx)
-            record: dict[str, str | int] = {"label": label}
-            for col in pivot.columns:
-                val = row[col]
-                if is_cost:
-                    record[col] = f"${val:.0f}" if val else "-"
-                else:
-                    record[col] = int(val) if val else "-"
-            records.append(record)
-        return records
+    raw_yearly = ql.yearly_by_category(accounts, include_manual=True)
+    yearly = collapse_categories(raw_yearly, keep=keep)
+    yearly_cost = collapse_categories(
+        apply_pass_costs(raw_yearly, pass_m), keep=keep,
+    )
 
     return {
-        "yearly_trips": {
-            "columns": ["Year"] + list(pivot_year.columns),
-            "data": df_to_records(pivot_year),
-        },
-        "monthly_trips": {
-            "columns": ["Month"] + list(pivot_month.columns),
-            "data": df_to_records(pivot_month),
-        },
-        "yearly_costs": {
-            "columns": ["Year"] + list(pivot_year_cost.columns),
-            "data": df_to_records(pivot_year_cost, is_cost=True),
-        },
-        "monthly_costs": {
-            "columns": ["Month"] + list(pivot_month_cost.columns),
-            "data": df_to_records(pivot_month_cost, is_cost=True),
-        },
+        "yearly_trips": _buckets_to_table(yearly, "count"),
+        "monthly_trips": _buckets_to_table(monthly, "count"),
+        "yearly_costs": _buckets_to_table(yearly_cost, "fare"),
+        "monthly_costs": _buckets_to_table(monthly_cost, "fare"),
     }
+
+
+# --- Helpers ---
+
+
+def _format_period(period: str) -> str:
+    """'2026-03' -> 'Mar 2026', '2026' -> '2026'."""
+    try:
+        dt = datetime.strptime(period, "%Y-%m")
+        return dt.strftime("%b %Y")
+    except ValueError:
+        return period
+
+
+def _pivot_buckets(
+    buckets: list[AggregateBucket], value: str,
+) -> tuple[dict[str, dict[str, float]], list[str]]:
+    """Group buckets into a period → category → value dict, preserving category order."""
+    by_period: dict[str, dict[str, float]] = defaultdict(dict)
+    seen: set[str] = set()
+    categories: list[str] = []
+    for b in buckets:
+        if b.category not in seen:
+            seen.add(b.category)
+            categories.append(b.category)
+        by_period[b.period][b.category] = (
+            b.total_fare if value == "fare" else b.count
+        )
+    return by_period, categories
+
+
+def _buckets_to_chartjs(
+    buckets: list[AggregateBucket], *, value: str,
+) -> dict:
+    """Convert AggregateBuckets to Chart.js format."""
+    by_period, categories = _pivot_buckets(buckets, value)
+    periods = sorted(by_period.keys())
+    labels = [_format_period(p) for p in periods]
+
+    datasets = []
+    for cat in categories:
+        color = config.transit_categories.get_color(cat)
+        data = [by_period[p].get(cat, 0) for p in periods]
+        if value == "fare":
+            data = [round(v, 2) for v in data]
+        datasets.append({
+            "label": cat,
+            "data": data,
+            "backgroundColor": color,
+        })
+
+    return {"labels": labels, "datasets": datasets}
+
+
+def _buckets_to_table(
+    buckets: list[AggregateBucket], value_type: str,
+) -> dict:
+    """Convert AggregateBuckets to table format for the frontend."""
+    by_period, categories = _pivot_buckets(buckets, value_type)
+    periods = sorted(by_period.keys(), reverse=True)
+    columns = ["Period"] + categories
+    data = []
+    for p in periods:
+        record: dict[str, str | int] = {"label": _format_period(p)}
+        for cat in categories:
+            val = by_period[p].get(cat, 0)
+            if value_type == "fare":
+                record[cat] = f"${val:.0f}" if val else "-"
+            else:
+                record[cat] = int(val) if val else "-"
+        data.append(record)
+
+    return {"columns": columns, "data": data}

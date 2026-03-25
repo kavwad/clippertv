@@ -34,18 +34,17 @@ def _sample_csv_df() -> pd.DataFrame:
     ])
 
 
-def test_ingest_adds_category_column():
-    """Pipeline adds category column via categorization."""
+def test_ingest_passes_df_without_category():
+    """Pipeline passes DataFrame through without adding category (derived at query time)."""
     store = MagicMock()
     store.save_csv_transactions.return_value = 2
 
-    count = ingest(_sample_csv_df(), rider_id="K", user_id="u1", store=store)
+    ingest(_sample_csv_df(), rider_id="K", user_id="u1", store=store)
 
     call_args = store.save_csv_transactions.call_args
     df_saved = call_args[0][1]  # second positional arg
-    assert "category" in df_saved.columns
-    assert df_saved.iloc[0]["category"] == "Muni Bus"
-    assert df_saved.iloc[1]["category"] == "BART"
+    assert "category" not in df_saved.columns
+    assert "operator" in df_saved.columns
 
 
 def test_ingest_returns_count():
