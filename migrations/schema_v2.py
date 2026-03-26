@@ -207,9 +207,9 @@ def step3_migrate_pdf(conn, mapping: dict[str, str]) -> int:
         account = _resolve(rider_id, mapping)
         operator = transit_map.get(transit_id, "") if transit_id else ""
 
-        # Skip rows with no operator (reloads, etc.)
+        # Skip rows with no operator (reloads, autoloads, card updates)
         if not operator:
-            operator = "Unknown"
+            continue
 
         start_loc = None
         end_loc = None
