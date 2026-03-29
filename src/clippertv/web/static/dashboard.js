@@ -134,68 +134,83 @@ function loadCharts(rider) {
             });
     }
 
-    // Comparison chart
+}
+
+function loadComparisonChart() {
     const compCanvas = document.getElementById('comparisonChart');
-    if (compCanvas) {
-        destroyChart('comparison');
-        fetch('/api/comparison')
-            .then(r => r.json())
-            .then(data => {
-                charts.comparison = new Chart(compCanvas, {
-                    type: 'line',
-                    data: data,
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: true,
-                        aspectRatio: window.innerWidth < 640 ? 1.2 : 2,
-                        interaction: {
-                            mode: 'index',
-                            intersect: false,
+    if (!compCanvas) return;
+    if (charts.comparison) return; // already loaded
+
+    fetch('/api/comparison')
+        .then(r => r.json())
+        .then(data => {
+            charts.comparison = new Chart(compCanvas, {
+                type: 'line',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: window.innerWidth < 640 ? 1.2 : 2,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Trips per month',
+                            align: 'start',
+                            font: { size: 16, weight: 'normal' }
                         },
-                        plugins: {
-                            title: {
-                                display: true,
-                                text: 'Trips per month',
-                                align: 'start',
-                                font: { size: 16, weight: 'normal' }
-                            },
-                            legend: {
-                                position: 'top',
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45,
                             }
                         },
-                        scales: {
-                            x: {
-                                ticks: {
-                                    maxRotation: 45,
-                                    minRotation: 45,
-                                }
-                            },
-                            y: {
-                                beginAtZero: true,
-                            }
+                        y: {
+                            beginAtZero: true,
                         }
                     }
-                });
+                }
             });
-    }
+        });
 }
 
 // Re-init charts and tabs after HTMX swaps dashboard content
 document.body.addEventListener('htmx:afterSwap', function(event) {
     if (event.detail.target.id === 'dashboard-content') {
+        destroyChart('comparison');
         const rider = new URLSearchParams(window.location.search).get('rider');
         if (rider) {
             loadCharts(rider);
         }
 
         // Re-bind tab click handlers for newly swapped content
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                switchTab(btn.closest('.tab-group').id, btn.dataset.tab);
-            });
-        });
+        bindTabHandlers();
     }
 });
+
+function bindTabHandlers() {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tabGroup = btn.closest('.tab-group');
+            switchTab(tabGroup.id, btn.dataset.tab);
+            // Lazy-load comparison chart when its tab is first opened
+            if (btn.dataset.tab === 'comparison') {
+                loadComparisonChart();
+            }
+        });
+    });
+}
+
+// Bind on initial page load
+bindTabHandlers();
 
 // Toggle active class on rider buttons immediately on click
 document.body.addEventListener('htmx:beforeRequest', function(event) {

@@ -14,7 +14,7 @@
     {% block content %}{% endblock %}
 
     <script>
-        // Tab switching
+        // Tab switching (used by dashboard.js bindTabHandlers)
         function switchTab(tabGroup, tabName) {
             const group = document.getElementById(tabGroup);
             group.querySelectorAll('.tab-btn').forEach(btn => {
@@ -24,13 +24,6 @@
                 content.classList.toggle('active', content.id === tabName);
             });
         }
-
-        // Initialize tabs
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                switchTab(btn.closest('.tab-group').id, btn.dataset.tab);
-            });
-        });
     </script>
 
     {% block scripts %}{% endblock %}
