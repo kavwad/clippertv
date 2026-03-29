@@ -85,6 +85,11 @@ h1 {
     height: auto !important;
 }
 
+/* Keep layout stable while charts load after HTMX swap */
+.chart-container {
+    min-height: 250px;
+}
+
 .tabs {
     display: flex;
     gap: 0.25rem;
@@ -189,4 +194,27 @@ th {
     th, td {
         padding: 0.4rem 0.3rem;
     }
+
+    .chart-container {
+        min-height: 180px;
+    }
+}
+
+/* View Transition crossfade for HTMX swaps */
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+::view-transition-old(root) {
+    animation: 120ms ease-out fade-out;
+}
+
+::view-transition-new(root) {
+    animation: 200ms ease-in fade-in;
 }
