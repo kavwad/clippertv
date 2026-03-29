@@ -68,18 +68,8 @@ def _keep_categories() -> list[str] | None:
     return _display_categories
 
 
-@router.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request, rider: str = ""):
-    """Render the main dashboard page."""
-    riders = get_riders()
-    if not riders:
-        return templates.TemplateResponse(request, "dashboard.html", {
-            "rider": None, "riders": [], "stats": None,
-            "color_map": config.transit_categories.color_map,
-        })
-    if rider not in riders:
-        rider = riders[0]
-
+def _dashboard_context(rider: str) -> dict:
+    """Build template context for a given rider."""
     ql = _get_ql()
     accounts = _accounts_for(rider)
     keep = _keep_categories()
@@ -144,16 +134,48 @@ async def dashboard(request: Request, rider: str = ""):
         stats_dict["most_recent_month"] = ""
         stats_dict["most_recent_month_is_january"] = False
 
-    return templates.TemplateResponse(
-        request, "dashboard.html", {
-            "rider": rider,
-            "riders": riders,
-            "stats": stats_dict,
-            "most_used_count": most_used_count,
-            "yearly_trip_total": yearly_trip_total,
-            "yearly_cost_total": yearly_cost_total,
+    return {
+        "rider": rider,
+        "stats": stats_dict,
+        "most_used_count": most_used_count,
+        "yearly_trip_total": yearly_trip_total,
+        "yearly_cost_total": yearly_cost_total,
+        "color_map": config.transit_categories.color_map,
+    }
+
+
+@router.get("/", response_class=HTMLResponse)
+async def dashboard(request: Request, rider: str = ""):
+    """Render the main dashboard page."""
+    riders = get_riders()
+    if not riders:
+        return templates.TemplateResponse(request, "dashboard.html", {
+            "rider": None, "riders": [], "stats": None,
             "color_map": config.transit_categories.color_map,
-        },
+        })
+    if rider not in riders:
+        rider = riders[0]
+
+    ctx = _dashboard_context(rider)
+    ctx["riders"] = riders
+    return templates.TemplateResponse(request, "dashboard.html", ctx)
+
+
+@router.get("/partials/dashboard", response_class=HTMLResponse)
+async def dashboard_partial(request: Request, rider: str = ""):
+    """Return dashboard content partial for HTMX swap."""
+    riders = get_riders()
+    if not riders:
+        return templates.TemplateResponse(
+            request, "partials/dashboard_content.html",
+            {"rider": None, "stats": None},
+        )
+    if rider not in riders:
+        rider = riders[0]
+
+    ctx = _dashboard_context(rider)
+    return templates.TemplateResponse(
+        request, "partials/dashboard_content.html", ctx,
     )
 
 
@@ -248,6 +270,34 @@ async def get_table_data(rider: str):
         "yearly_costs": _buckets_to_table(yearly_cost, "fare"),
         "monthly_costs": _buckets_to_table(monthly_cost, "fare"),
     }
+
+
+@router.get("/partials/tables/{rider}", response_class=HTMLResponse)
+async def get_table_html(request: Request, rider: str):
+    """Return pre-rendered table HTML for HTMX swap."""
+    ql = _get_ql()
+    accounts = _accounts_for(rider)
+    keep = _keep_categories()
+    pass_m = ql.pass_months(accounts)
+
+    raw_monthly = ql.monthly_by_category(accounts, include_manual=True)
+    monthly = collapse_categories(raw_monthly, keep=keep)
+    monthly_cost = collapse_categories(
+        apply_pass_costs(raw_monthly, pass_m), keep=keep,
+    )
+
+    raw_yearly = ql.yearly_by_category(accounts, include_manual=True)
+    yearly = collapse_categories(raw_yearly, keep=keep)
+    yearly_cost = collapse_categories(
+        apply_pass_costs(raw_yearly, pass_m), keep=keep,
+    )
+
+    return templates.TemplateResponse(request, "partials/tables.html", {
+        "yearly_trips": _buckets_to_table(yearly, "count"),
+        "yearly_costs": _buckets_to_table(yearly_cost, "fare"),
+        "monthly_trips": _buckets_to_table(monthly, "count"),
+        "monthly_costs": _buckets_to_table(monthly_cost, "fare"),
+    })
 
 
 # --- Helpers ---

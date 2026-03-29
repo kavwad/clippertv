@@ -1,0 +1,56 @@
+{% if rider is none %}
+<div class="stats">
+    <p>No data yet. Use <code>clipper-download --ingest</code> to import transactions.</p>
+</div>
+{% else %}
+
+<div class="stats">
+    <p>
+        <strong>{{ rider }}</strong> took <span class="highlight">{{ stats.trips_this_month }}</span> trips in
+        {{ stats.most_recent_month }}, which cost
+        <span class="highlight">${{ stats.cost_this_month }}</span>.
+    </p>
+    <p>
+        {{ rider }} rode <strong>{{ stats.most_used_mode }}</strong> most, at
+        <strong>{{ most_used_count }}</strong> times.
+        Altogether, {{ rider }} took {{ stats.trip_diff|abs }} {{ stats.trip_diff_text }}
+        trips and paid ${{ stats.cost_diff|abs }} {{ stats.cost_diff_text }}
+        than the previous month.
+    </p>
+    {% if stats.pass_upshot is not none %}
+        {% if stats.pass_upshot < 0 %}
+        <p>This month, {{ rider }} saved <strong>${{ -stats.pass_upshot }}</strong> with a Caltrain pass.</p>
+        {% elif stats.pass_upshot > 0 %}
+        <p>This month, {{ rider }} spent an extra <strong>${{ stats.pass_upshot }}</strong> by getting a Caltrain pass (!!).</p>
+        {% else %}
+        <p>This month, {{ rider }} broke even with a Caltrain pass.</p>
+        {% endif %}
+    {% endif %}
+    {% if not stats.most_recent_month_is_january %}
+    <p>
+        This year, {{ rider }} has taken <strong>{{ yearly_trip_total }}</strong> trips,
+        costing <strong>${{ yearly_cost_total }}</strong>.
+    </p>
+    {% endif %}
+</div>
+
+<div class="chart-container">
+    <canvas id="tripChart"></canvas>
+</div>
+
+<div class="chart-container">
+    <canvas id="costChart"></canvas>
+</div>
+
+<div class="tab-group" id="dataTabs">
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="annual">Annual stats</button>
+        <button class="tab-btn" data-tab="monthly">Monthly stats</button>
+        <button class="tab-btn" data-tab="comparison">Comparison</button>
+    </div>
+
+    <div hx-get="/partials/tables/{{ rider }}" hx-trigger="load" hx-swap="innerHTML">
+        <p class="htmx-indicator" style="color: var(--text-muted); padding: 1rem;">Loading tables...</p>
+    </div>
+</div>
+{% endif %}
