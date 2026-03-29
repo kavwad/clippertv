@@ -8,6 +8,7 @@
        hx-target="#dashboard-content"
        hx-swap="innerHTML transition:true"
        hx-push-url="/?rider={{ r }}"
+       preload="mousedown"
        class="rider-btn {% if r == rider %}active{% endif %}">{{ r }}</a>
     {% endfor %}
 </div>
