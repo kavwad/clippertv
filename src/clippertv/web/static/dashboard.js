@@ -58,6 +58,13 @@ function destroyChart(name) {
     }
 }
 
+function revealChart(canvasId, skeletonId) {
+    const skeleton = document.getElementById(skeletonId);
+    const canvas = document.getElementById(canvasId);
+    if (skeleton) skeleton.style.display = 'none';
+    if (canvas) canvas.style.display = '';
+}
+
 function loadCharts(rider) {
     const opts = getChartOptions();
 
@@ -68,6 +75,7 @@ function loadCharts(rider) {
         fetch(`/api/trips/${rider}`)
             .then(r => r.json())
             .then(data => {
+                revealChart('tripChart', 'tripSkeleton');
                 charts.trip = new Chart(tripCanvas, {
                     type: 'bar',
                     data: data,
@@ -94,6 +102,7 @@ function loadCharts(rider) {
         fetch(`/api/costs/${rider}`)
             .then(r => r.json())
             .then(data => {
+                revealChart('costChart', 'costSkeleton');
                 charts.cost = new Chart(costCanvas, {
                     type: 'bar',
                     data: data,

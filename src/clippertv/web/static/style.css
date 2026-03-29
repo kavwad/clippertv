@@ -85,9 +85,22 @@ h1 {
     height: auto !important;
 }
 
-/* Keep layout stable while charts load after HTMX swap */
+/* Skeleton placeholder while charts load */
 .chart-container {
     min-height: 250px;
+}
+
+.chart-skeleton {
+    background: linear-gradient(90deg, var(--surface) 25%, var(--border) 50%, var(--surface) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+    border-radius: 0.25rem;
+    height: 200px;
+}
+
+@keyframes skeleton-pulse {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
 .tabs {
