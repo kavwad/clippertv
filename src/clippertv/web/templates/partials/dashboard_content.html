@@ -49,8 +49,14 @@
         <button class="tab-btn" data-tab="comparison">Comparison</button>
     </div>
 
-    <div hx-get="/partials/tables/{{ rider }}" hx-trigger="load" hx-swap="innerHTML">
+    <div id="table-tabs" hx-get="/partials/tables/{{ rider }}" hx-trigger="load" hx-swap="innerHTML">
         <p class="htmx-indicator" style="color: var(--text-muted); padding: 1rem;">Loading tables...</p>
+    </div>
+
+    <div class="tab-content" id="comparison">
+        <div class="chart-container">
+            <canvas id="comparisonChart"></canvas>
+        </div>
     </div>
 </div>
 {% endif %}
