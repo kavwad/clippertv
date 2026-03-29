@@ -1,24 +1,24 @@
 {% from "partials/_table.html" import render_table %}
 
 <div class="tab-content active" id="annual">
-    <h3 style="margin-bottom: 0.5rem; color: var(--text-muted);">Annual trips by mode</h3>
+    <h3 class="table-heading">Annual trips by mode</h3>
     <div class="table-container">
         {{ render_table(yearly_trips) }}
     </div>
 
-    <h3 style="margin: 1rem 0 0.5rem; color: var(--text-muted);">Annual cost by mode</h3>
+    <h3 class="table-heading">Annual cost by mode</h3>
     <div class="table-container">
         {{ render_table(yearly_costs) }}
     </div>
 </div>
 
 <div class="tab-content" id="monthly">
-    <h3 style="margin-bottom: 0.5rem; color: var(--text-muted);">Monthly trips by mode</h3>
+    <h3 class="table-heading">Monthly trips by mode</h3>
     <div class="table-container">
         {{ render_table(monthly_trips) }}
     </div>
 
-    <h3 style="margin: 1rem 0 0.5rem; color: var(--text-muted);">Monthly cost by mode</h3>
+    <h3 class="table-heading">Monthly cost by mode</h3>
     <div class="table-container">
         {{ render_table(monthly_costs) }}
     </div>

@@ -66,12 +66,14 @@ function revealChart(canvasId, skeletonId) {
 }
 
 function loadCharts(rider) {
+    destroyChart('trip');
+    destroyChart('cost');
+
     const opts = getChartOptions();
 
     // Trip chart
     const tripCanvas = document.getElementById('tripChart');
     if (tripCanvas) {
-        destroyChart('trip');
         fetch(`/api/trips/${rider}`)
             .then(r => r.json())
             .then(data => {
@@ -98,7 +100,6 @@ function loadCharts(rider) {
     // Cost chart
     const costCanvas = document.getElementById('costChart');
     if (costCanvas) {
-        destroyChart('cost');
         fetch(`/api/costs/${rider}`)
             .then(r => r.json())
             .then(data => {
@@ -199,27 +200,19 @@ document.body.addEventListener('htmx:afterSwap', function(event) {
         if (rider) {
             loadCharts(rider);
         }
-
-        // Re-bind tab click handlers for newly swapped content
-        bindTabHandlers();
     }
 });
 
-function bindTabHandlers() {
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tabGroup = btn.closest('.tab-group');
-            switchTab(tabGroup.id, btn.dataset.tab);
-            // Lazy-load comparison chart when its tab is first opened
-            if (btn.dataset.tab === 'comparison') {
-                loadComparisonChart();
-            }
-        });
-    });
-}
-
-// Bind on initial page load
-bindTabHandlers();
+// Tab click handling via event delegation (works across HTMX swaps)
+document.body.addEventListener('click', function(event) {
+    const btn = event.target.closest('.tab-btn');
+    if (!btn) return;
+    const tabGroup = btn.closest('.tab-group');
+    switchTab(tabGroup.id, btn.dataset.tab);
+    if (btn.dataset.tab === 'comparison') {
+        loadComparisonChart();
+    }
+});
 
 // Toggle active class on rider buttons immediately on click
 document.body.addEventListener('htmx:beforeRequest', function(event) {

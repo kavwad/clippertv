@@ -244,9 +244,8 @@ async def get_comparison_data():
     return {"labels": labels, "datasets": datasets}
 
 
-@router.get("/api/tables/{rider}")
-async def get_table_data(rider: str):
-    """Return pivot table data for display."""
+def _table_context(rider: str) -> dict:
+    """Build table data for a rider, shared by JSON and HTML endpoints."""
     ql = _get_ql()
     accounts = _accounts_for(rider)
     keep = _keep_categories()
@@ -266,38 +265,24 @@ async def get_table_data(rider: str):
 
     return {
         "yearly_trips": _buckets_to_table(yearly, "count"),
-        "monthly_trips": _buckets_to_table(monthly, "count"),
         "yearly_costs": _buckets_to_table(yearly_cost, "fare"),
+        "monthly_trips": _buckets_to_table(monthly, "count"),
         "monthly_costs": _buckets_to_table(monthly_cost, "fare"),
     }
+
+
+@router.get("/api/tables/{rider}")
+async def get_table_data(rider: str):
+    """Return pivot table data for display."""
+    return _table_context(rider)
 
 
 @router.get("/partials/tables/{rider}", response_class=HTMLResponse)
 async def get_table_html(request: Request, rider: str):
     """Return pre-rendered table HTML for HTMX swap."""
-    ql = _get_ql()
-    accounts = _accounts_for(rider)
-    keep = _keep_categories()
-    pass_m = ql.pass_months(accounts)
-
-    raw_monthly = ql.monthly_by_category(accounts, include_manual=True)
-    monthly = collapse_categories(raw_monthly, keep=keep)
-    monthly_cost = collapse_categories(
-        apply_pass_costs(raw_monthly, pass_m), keep=keep,
+    return templates.TemplateResponse(
+        request, "partials/tables.html", _table_context(rider),
     )
-
-    raw_yearly = ql.yearly_by_category(accounts, include_manual=True)
-    yearly = collapse_categories(raw_yearly, keep=keep)
-    yearly_cost = collapse_categories(
-        apply_pass_costs(raw_yearly, pass_m), keep=keep,
-    )
-
-    return templates.TemplateResponse(request, "partials/tables.html", {
-        "yearly_trips": _buckets_to_table(yearly, "count"),
-        "yearly_costs": _buckets_to_table(yearly_cost, "fare"),
-        "monthly_trips": _buckets_to_table(monthly, "count"),
-        "monthly_costs": _buckets_to_table(monthly_cost, "fare"),
-    })
 
 
 # --- Helpers ---

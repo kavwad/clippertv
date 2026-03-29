@@ -83,6 +83,7 @@ h1 {
     margin-bottom: 1.5rem;
     position: relative;
     width: 100%;
+    min-height: 250px;
 }
 
 .chart-container canvas {
@@ -91,10 +92,6 @@ h1 {
 }
 
 /* Skeleton placeholder while charts load */
-.chart-container {
-    min-height: 250px;
-}
-
 .chart-skeleton {
     background: linear-gradient(90deg, var(--surface) 25%, var(--border) 50%, var(--surface) 75%);
     background-size: 200% 100%;
@@ -142,6 +139,15 @@ h1 {
 
 .tab-content.active {
     display: block;
+}
+
+.table-heading {
+    margin: 1rem 0 0.5rem;
+    color: var(--text-muted);
+}
+
+.table-heading:first-child {
+    margin-top: 0;
 }
 
 .table-container {
