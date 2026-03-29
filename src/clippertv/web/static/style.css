@@ -55,6 +55,11 @@ h1 {
     border-color: var(--accent);
 }
 
+.rider-btn.htmx-request {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
 .stats {
     background: var(--surface);
     border-radius: 0.5rem;
