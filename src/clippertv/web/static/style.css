@@ -202,6 +202,7 @@ th {
 
     .chart-container {
         padding: 0.75rem;
+        min-height: 180px;
         /* Allow horizontal scroll on mobile */
         overflow-x: auto;
     }
@@ -217,10 +218,6 @@ th {
 
     th, td {
         padding: 0.4rem 0.3rem;
-    }
-
-    .chart-container {
-        min-height: 180px;
     }
 }
 
