@@ -1,0 +1,21 @@
+{% macro render_table(table_data) %}
+<table>
+    <thead>
+        <tr>
+            {% for col in table_data.columns %}
+            <th>{{ col }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in table_data.data %}
+        <tr>
+            <td>{{ row.label }}</td>
+            {% for col in table_data.columns[1:] %}
+            <td>{{ row[col] if row[col] is defined else '-' }}</td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endmacro %}

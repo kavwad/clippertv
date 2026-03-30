@@ -1,0 +1,25 @@
+{% from "partials/_table.html" import render_table %}
+
+<div class="tab-content active" id="annual">
+    <h3 class="table-heading">Annual trips by mode</h3>
+    <div class="table-container">
+        {{ render_table(yearly_trips) }}
+    </div>
+
+    <h3 class="table-heading">Annual cost by mode</h3>
+    <div class="table-container">
+        {{ render_table(yearly_costs) }}
+    </div>
+</div>
+
+<div class="tab-content" id="monthly">
+    <h3 class="table-heading">Monthly trips by mode</h3>
+    <div class="table-container">
+        {{ render_table(monthly_trips) }}
+    </div>
+
+    <h3 class="table-heading">Monthly cost by mode</h3>
+    <div class="table-container">
+        {{ render_table(monthly_costs) }}
+    </div>
+</div>

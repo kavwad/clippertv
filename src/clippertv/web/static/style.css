@@ -1,0 +1,241 @@
+:root {
+    --bg: #0e1117;
+    --surface: #1a1d24;
+    --text: #fafafa;
+    --text-muted: #a0a0a0;
+    --accent: #ff4b4b;
+    --border: #2d3139;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 1rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+h1 {
+    font-size: 1.75rem;
+    margin-bottom: 1rem;
+}
+
+.rider-selector {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.rider-btn {
+    padding: 0.5rem 1.5rem;
+    border: 2px solid var(--border);
+    border-radius: 2rem;
+    background: transparent;
+    color: var(--text);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+}
+
+.rider-btn:hover {
+    border-color: var(--accent);
+}
+
+.rider-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.rider-btn.htmx-request {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.stats {
+    background: var(--surface);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.stats p {
+    margin-bottom: 0.5rem;
+}
+
+.highlight {
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.chart-container {
+    background: var(--surface);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    position: relative;
+    width: 100%;
+    min-height: 250px;
+}
+
+.chart-container canvas {
+    width: 100% !important;
+    height: auto !important;
+}
+
+/* Skeleton placeholder while charts load */
+.chart-skeleton {
+    background: linear-gradient(90deg, var(--surface) 25%, var(--border) 50%, var(--surface) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+    border-radius: 0.25rem;
+    height: 200px;
+}
+
+@keyframes skeleton-pulse {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.tabs {
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+}
+
+.tab-btn {
+    padding: 0.75rem 1rem;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+}
+
+.tab-btn:hover {
+    color: var(--text);
+}
+
+.tab-btn.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.table-heading {
+    margin: 1rem 0 0.5rem;
+    color: var(--text-muted);
+}
+
+.table-heading:first-child {
+    margin-top: 0;
+}
+
+.table-container {
+    overflow-x: auto;
+    margin-bottom: 1.5rem;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+th, td {
+    padding: 0.5rem;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+}
+
+th:first-child, td:first-child {
+    text-align: left;
+    position: sticky;
+    left: 0;
+    background: var(--surface);
+}
+
+th {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* HTMX loading indicators */
+.htmx-indicator {
+    opacity: 0;
+    transition: opacity 200ms ease-in;
+}
+
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+    opacity: 1;
+}
+
+/* Mobile-first responsive */
+@media (max-width: 640px) {
+    body {
+        padding: 0.75rem;
+    }
+
+    h1 {
+        font-size: 1.5rem;
+    }
+
+    .chart-container {
+        padding: 0.75rem;
+        min-height: 180px;
+        /* Allow horizontal scroll on mobile */
+        overflow-x: auto;
+    }
+
+    .stats {
+        padding: 0.75rem;
+        font-size: 0.95rem;
+    }
+
+    table {
+        font-size: 0.8rem;
+    }
+
+    th, td {
+        padding: 0.4rem 0.3rem;
+    }
+}
+
+/* View Transition crossfade for HTMX swaps */
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+::view-transition-old(root) {
+    animation: 120ms ease-out fade-out;
+}
+
+::view-transition-new(root) {
+    animation: 200ms ease-in fade-in;
+}
