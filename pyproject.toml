@@ -24,6 +24,7 @@ web = [
 [project.scripts]
 clippertv-web = "clippertv.web.main:run"
 clipper-download = "clippertv.ingest.clipper:main"
+clippertv-ingest = "clippertv.scheduler.service:main"
 
 [build-system]
 requires = ["setuptools>=61.0"]

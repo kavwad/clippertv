@@ -8,6 +8,10 @@ uv run uvicorn clippertv.web.main:app --reload --host 0.0.0.0
 
 # Download and ingest Clipper card transactions
 clipper-download --last-month --ingest
+clipper-download --days 14 --ingest    # Rolling window
+
+# Scheduled ingestion (all accounts, last 30 days)
+uv run clippertv-ingest --days 30 -v
 
 # Tests
 uv run pytest                        # All tests
@@ -34,6 +38,11 @@ uv run python migrations/schema_v2.py --swap   # destructive swap
 ### Ingestion (`src/clippertv/ingest/`)
 - `clipper.py` - CSV downloader and CLI entry point (`clipper-download`)
 - `pipeline.py` - Thin orchestrator: parse CSV → store (no category derivation)
+
+### Scheduler (`src/clippertv/scheduler/`)
+- `service.py` - Platform-agnostic ingestion runner (`run_ingestion()`, `clippertv-ingest` CLI)
+- `__main__.py` - `python -m clippertv.scheduler` support
+- `scheduler/` (repo root) - launchd plist + shell wrapper (platform glue)
 
 ### Data Layer (`src/clippertv/data/`)
 - `domain.py` - Typed dataclasses (Trip, AggregateBucket, RiderSummary, ComparisonPoint)
@@ -79,6 +88,7 @@ Required in `.env`:
 - **Line length**: Max 88 characters
 
 ## Testing
+- Scheduler: `tests/scheduler/` (service, CLI)
 - Data: `tests/data/` (schema, queries)
 - Analytics: `tests/analytics/` (pass costs, categories, comparison, summary)
 - Ingest: `tests/ingest/` (CSV parsing, pipeline)

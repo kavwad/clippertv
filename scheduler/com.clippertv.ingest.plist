@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+
+  <key>Label</key>
+  <string>com.clippertv.ingest</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/kaveh/Developer/personal/clippertv/scheduler/clippertv-ingest.sh</string>
+  </array>
+
+  <!-- Run every Monday at 08:00 -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Weekday</key>
+    <integer>1</integer>
+    <key>Hour</key>
+    <integer>8</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/clippertv-ingest.stdout.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/tmp/clippertv-ingest.stderr.log</string>
+
+  <!-- Pass PATH so uv is discoverable -->
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/kaveh/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>HEALTHCHECK_URL</key>
+    <string>https://hc-ping.com/f320843c-de08-46fb-bb81-0fe5b136db54</string>
+  </dict>
+
+</dict>
+</plist>

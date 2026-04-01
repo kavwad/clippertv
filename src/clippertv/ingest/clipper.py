@@ -5,6 +5,7 @@ Clipper CSV downloader and parser.
 Download CSV transaction reports from clippercard.com and parse them into
 normalized DataFrames.
 """
+
 import argparse
 import os
 import sys
@@ -76,7 +77,9 @@ def parse_csv(csv_content: str) -> pd.DataFrame:
 
     def _parse_location(series: pd.Series) -> pd.Series:
         result = series.apply(
-            lambda v: None if (v is None or str(v).strip() in _NA_VALUES) else str(v).strip()
+            lambda v: (
+                None if (v is None or str(v).strip() in _NA_VALUES) else str(v).strip()
+            )
         )
         assert isinstance(result, pd.Series)
         return result
@@ -269,7 +272,9 @@ def download_transactions(
 
     for i, (chunk_start, chunk_end) in enumerate(chunks):
         if len(chunks) > 1:
-            print(f"Downloading chunk {i + 1}/{len(chunks)}: {chunk_start} to {chunk_end}")
+            print(
+                f"Downloading chunk {i + 1}/{len(chunks)}: {chunk_start} to {chunk_end}"
+            )
         csv_content = download_csv(session, chunk_start, chunk_end, dry_run)
 
         if dry_run or not csv_content:
@@ -306,8 +311,12 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Download CSV transaction reports from clippercard.com."
     )
-    parser.add_argument("--email", help="Login email (optional if using --user or --all)")
-    parser.add_argument("--password", help="Password (optional if using --user or --all)")
+    parser.add_argument(
+        "--email", help="Login email (optional if using --user or --all)"
+    )
+    parser.add_argument(
+        "--password", help="Password (optional if using --user or --all)"
+    )
     parser.add_argument(
         "--output",
         default="downloads",
@@ -330,6 +339,12 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         dest="last_month",
         help="Download last month's transactions (overrides start/end dates)",
+    )
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=0,
+        help="Download the last N days of transactions (overrides start/end dates)",
     )
     parser.add_argument(
         "--dry-run",
@@ -396,7 +411,7 @@ def main() -> int:
     args = _parse_args()
 
     if args.ingest_file:
-        from clippertv.data.factory import get_data_store
+        from clippertv.data.turso_store import TursoStore
         from clippertv.ingest.pipeline import ingest as run_ingest
 
         try:
@@ -405,7 +420,7 @@ def main() -> int:
             sys.stderr.write(f"Error loading config file {args.config_file}: {e}\n")
             return 2
         card_to_rider = _build_card_to_rider(config_data.get("accounts", []))
-        store = get_data_store()
+        store = TursoStore()
 
         for filepath in args.ingest_file:
             print(f"Ingesting {filepath}...")
@@ -460,7 +475,14 @@ def main() -> int:
                 "[--email=email --password=password] [options]\n"
             )
             return 2
-        accounts = [{"name": "manual", "email": args.email, "password": args.password, "cards": []}]
+        accounts = [
+            {
+                "name": "manual",
+                "email": args.email,
+                "password": args.password,
+                "cards": [],
+            }
+        ]
 
     start_date = args.start_date
     end_date = args.end_date
@@ -471,6 +493,11 @@ def main() -> int:
         start_date = last.replace(day=1).strftime("%Y-%m-%d")
         end_date = last.strftime("%Y-%m-%d")
         print(f"Using last month date range: {start_date} to {end_date}")
+    elif args.days > 0:
+        today = date.today()
+        start_date = (today - timedelta(days=args.days)).strftime("%Y-%m-%d")
+        end_date = today.strftime("%Y-%m-%d")
+        print(f"Using last {args.days} days: {start_date} to {end_date}")
 
     if args.dry_run:
         print("[DRY RUN] Testing login and CSV download parameters...")
@@ -497,10 +524,10 @@ def main() -> int:
             return 1
 
     if args.ingest and not args.dry_run:
-        from clippertv.data.factory import get_data_store
+        from clippertv.data.turso_store import TursoStore
         from clippertv.ingest.pipeline import ingest as run_ingest
 
-        store = get_data_store()
+        store = TursoStore()
         for download in all_downloaded:
             csv_content = download["content"]
             df = parse_csv(csv_content)
