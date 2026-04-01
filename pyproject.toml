@@ -45,13 +45,20 @@ dev = [
 
 [tool.ruff]
 src = ["src"]
+target-version = "py313"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP"]
+select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/ingest/test_clipper.py" = ["E501"]
+
+[tool.pytest.ini_options]
+markers = [
+    "prepush: fast tests that run before every commit",
+    "integration: tests that hit real APIs (skip in prepush)",
+]
 
 [tool.ty.environment]
 python-version = "3.13"

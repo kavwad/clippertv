@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/stop-fix.sh",
+            "timeout": 30,
+            "statusMessage": "Running jj fix..."
+          }
+        ]
+      }
+    ]
+  }
+}
