@@ -1,15 +1,14 @@
 """Tests for Clipper CSV parsing."""
 
 import pandas as pd
-import pytest
 
 from clippertv.ingest.clipper import parse_csv
 
-SAMPLE_CSV = '''"ACCOUNT NUMBER","END DATE/TIME","END LOCATION","FARE","OPERATOR","PASS","START DATE/TIME","START LOCATION","TRIP ID"
+SAMPLE_CSV = """"ACCOUNT NUMBER","END DATE/TIME","END LOCATION","FARE","OPERATOR","PASS","START DATE/TIME","START LOCATION","TRIP ID"
 "100005510894","N/A","N/A","$2.85","Muni","Cash Value ","02/28/2026 23:45:19","Haight/Noriega","11052564"
 "100005510894","02/28/2026 22:00:43","16th Street / Mission","$5.35","BART","Cash Value ","02/28/2026 21:16:16","Fruitvale","11047705"
 "100005510894","N/A","N/A","$0.00","Muni","N/A","02/22/2026 18:41:36","NONE","10003757"
-'''
+"""
 
 
 class TestParseCSV:
@@ -18,9 +17,15 @@ class TestParseCSV:
     def test_column_names(self):
         df = parse_csv(SAMPLE_CSV)
         expected = {
-            "account_number", "transaction_date", "end_datetime",
-            "start_location", "end_location", "fare", "operator",
-            "pass_type", "trip_id",
+            "account_number",
+            "transaction_date",
+            "end_datetime",
+            "start_location",
+            "end_location",
+            "fare",
+            "operator",
+            "pass_type",
+            "trip_id",
         }
         assert set(df.columns) == expected
 

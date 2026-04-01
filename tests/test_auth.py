@@ -1,9 +1,11 @@
 """Test authentication service."""
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, timedelta, timezone
-from clippertv.auth.service import AuthService
+
 from clippertv.auth.crypto import CredentialEncryption
+from clippertv.auth.service import AuthService
 from clippertv.data.models import AuthToken
 
 
@@ -81,8 +83,8 @@ class TestAuthService:
 
         # Check that expiration is in the future
         exp_timestamp = payload["exp"]
-        exp_datetime = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
-        now = datetime.now(timezone.utc)
+        exp_datetime = datetime.fromtimestamp(exp_timestamp, tz=UTC)
+        now = datetime.now(UTC)
 
         assert exp_datetime > now
 
@@ -176,7 +178,8 @@ class TestCredentialEncryption:
         assert encrypted
 
     def test_different_keys_cannot_decrypt(self):
-        """Test that credentials encrypted with one key cannot be decrypted with another."""
+        """Test that credentials encrypted with one key cannot be decrypted
+        with another."""
         crypto1 = CredentialEncryption(CredentialEncryption.generate_key())
         crypto2 = CredentialEncryption(CredentialEncryption.generate_key())
 

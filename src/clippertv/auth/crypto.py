@@ -1,8 +1,8 @@
 """Encryption utilities for sensitive data."""
 
-from cryptography.fernet import Fernet
-from typing import Optional
 import json
+
+from cryptography.fernet import Fernet
 
 
 class CredentialEncryption:
@@ -32,7 +32,7 @@ class CredentialEncryption:
         encrypted = self.cipher.encrypt(data.encode())
         return encrypted.decode()
 
-    def decrypt_credentials(self, encrypted: str) -> Optional[dict]:
+    def decrypt_credentials(self, encrypted: str) -> dict | None:
         """
         Decrypt Clipper login credentials.
 

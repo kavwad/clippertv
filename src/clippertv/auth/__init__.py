@@ -1,6 +1,6 @@
 """Authentication module for ClipperTV."""
 
-from .service import AuthService
 from .crypto import CredentialEncryption
+from .service import AuthService
 
 __all__ = ["AuthService", "CredentialEncryption"]

@@ -35,10 +35,14 @@ def collapse_categories(
                 other_count += b.count
                 other_fare += b.total_fare
         if other_count > 0:
-            result.append(AggregateBucket(
-                period=period, category="Other",
-                count=other_count, total_fare=other_fare,
-            ))
+            result.append(
+                AggregateBucket(
+                    period=period,
+                    category="Other",
+                    count=other_count,
+                    total_fare=other_fare,
+                )
+            )
     return result
 
 

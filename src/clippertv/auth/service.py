@@ -1,16 +1,19 @@
 """Authentication service using JWT tokens."""
 
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
+
 import bcrypt
 import jwt
+
 from ..data.models import AuthToken
 
 
 class AuthService:
     """Handles user authentication and token management."""
 
-    def __init__(self, secret_key: str, algorithm: str = "HS256", token_expiry_days: int = 7):
+    def __init__(
+        self, secret_key: str, algorithm: str = "HS256", token_expiry_days: int = 7
+    ):
         """
         Initialize authentication service.
 
@@ -63,24 +66,18 @@ class AuthService:
         Returns:
             AuthToken containing access token and metadata
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expire = now + self.token_expiry
 
-        payload = {
-            "sub": user_id,
-            "email": email,
-            "exp": expire,
-            "iat": now
-        }
+        payload = {"sub": user_id, "email": email, "exp": expire, "iat": now}
 
         token = jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
 
         return AuthToken(
-            access_token=token,
-            expires_in=int(self.token_expiry.total_seconds())
+            access_token=token, expires_in=int(self.token_expiry.total_seconds())
         )
 
-    def verify_token(self, token: str) -> Optional[dict]:
+    def verify_token(self, token: str) -> dict | None:
         """
         Verify and decode JWT token.
 
@@ -98,7 +95,7 @@ class AuthService:
         except jwt.InvalidTokenError:
             return None
 
-    def get_user_id_from_token(self, token: str) -> Optional[str]:
+    def get_user_id_from_token(self, token: str) -> str | None:
         """
         Extract user ID from token.
 

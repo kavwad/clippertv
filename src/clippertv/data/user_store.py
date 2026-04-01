@@ -1,11 +1,11 @@
 """User and Clipper card data access layer."""
 
-from typing import Optional, List
-from datetime import datetime
 import uuid
-from .models import User, UserCreate, ClipperCard, ClipperCardCreate
-from ..auth.service import AuthService
+from datetime import datetime
+
 from ..auth.crypto import CredentialEncryption
+from ..auth.service import AuthService
+from .models import ClipperCard, ClipperCardCreate, User, UserCreate
 
 
 class UserStore:
@@ -24,7 +24,7 @@ class UserStore:
         self.auth = auth_service
         self.crypto = crypto
 
-    def create_user(self, user_data: UserCreate) -> Optional[User]:
+    def create_user(self, user_data: UserCreate) -> User | None:
         """
         Register new user account.
 
@@ -57,7 +57,7 @@ class UserStore:
 
         return self.get_user_by_id(user_id)
 
-    def get_user_by_email(self, email: str) -> Optional[User]:
+    def get_user_by_email(self, email: str) -> User | None:
         """
         Find user by email address.
 
@@ -84,7 +84,7 @@ class UserStore:
             updated_at=datetime.fromisoformat(row[4]) if row[4] else datetime.now(),
         )
 
-    def get_user_by_id(self, user_id: str) -> Optional[User]:
+    def get_user_by_id(self, user_id: str) -> User | None:
         """
         Find user by ID.
 
@@ -111,7 +111,7 @@ class UserStore:
             updated_at=datetime.fromisoformat(row[4]) if row[4] else datetime.now(),
         )
 
-    def verify_user_credentials(self, email: str, password: str) -> Optional[User]:
+    def verify_user_credentials(self, email: str, password: str) -> User | None:
         """
         Authenticate user with email and password.
 
@@ -123,7 +123,8 @@ class UserStore:
             User instance if credentials are valid, None otherwise
         """
         result = self.client.execute(
-            "SELECT id, email, name, password_hash, created_at, updated_at FROM users WHERE email = ?",
+            "SELECT id, email, name, password_hash, created_at, updated_at"
+            " FROM users WHERE email = ?",
             [email],
         )
         row = result.fetchone()
@@ -146,7 +147,7 @@ class UserStore:
 
     def add_clipper_card(
         self, user_id: str, card_data: ClipperCardCreate
-    ) -> Optional[ClipperCard]:
+    ) -> ClipperCard | None:
         """
         Associate Clipper card with user account.
 
@@ -189,7 +190,9 @@ class UserStore:
 
         self.client.execute(
             """
-            INSERT INTO clipper_cards (id, user_id, card_number, rider_name, credentials_encrypted, is_primary, created_at)
+            INSERT INTO clipper_cards
+                (id, user_id, card_number, rider_name,
+                 credentials_encrypted, is_primary, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             [
@@ -206,7 +209,7 @@ class UserStore:
 
         return self.get_clipper_card(card_id)
 
-    def get_clipper_card(self, card_id: str) -> Optional[ClipperCard]:
+    def get_clipper_card(self, card_id: str) -> ClipperCard | None:
         """
         Get Clipper card by ID.
 
@@ -218,7 +221,8 @@ class UserStore:
         """
         result = self.client.execute(
             """
-            SELECT id, user_id, card_number, rider_name, credentials_encrypted, is_primary, created_at
+            SELECT id, user_id, card_number, rider_name,
+                   credentials_encrypted, is_primary, created_at
             FROM clipper_cards WHERE id = ?
             """,
             [card_id],
@@ -238,7 +242,7 @@ class UserStore:
             created_at=datetime.fromisoformat(row[6]) if row[6] else datetime.now(),
         )
 
-    def get_user_clipper_cards(self, user_id: str) -> List[ClipperCard]:
+    def get_user_clipper_cards(self, user_id: str) -> list[ClipperCard]:
         """
         Get all Clipper cards for a user.
 
@@ -250,8 +254,10 @@ class UserStore:
         """
         result = self.client.execute(
             """
-            SELECT id, user_id, card_number, rider_name, credentials_encrypted, is_primary, created_at
-            FROM clipper_cards WHERE user_id = ? ORDER BY is_primary DESC, created_at ASC
+            SELECT id, user_id, card_number, rider_name,
+                   credentials_encrypted, is_primary, created_at
+            FROM clipper_cards
+            WHERE user_id = ? ORDER BY is_primary DESC, created_at ASC
             """,
             [user_id],
         )
@@ -274,7 +280,7 @@ class UserStore:
 
         return cards
 
-    def get_decrypted_credentials(self, card_id: str) -> Optional[dict]:
+    def get_decrypted_credentials(self, card_id: str) -> dict | None:
         """
         Get decrypted Clipper credentials for automated downloads.
 

@@ -1,8 +1,9 @@
-"""Schema v2 migration: consolidate old multi-layer schema into clean trips/manual_trips/category_rules.
+"""Schema v2 migration: consolidate old multi-layer schema into clean
+trips/manual_trips/category_rules.
 
 Usage:
     uv run python migrations/schema_v2.py          # Steps 0-6 (non-destructive)
-    uv run python migrations/schema_v2.py --swap    # Steps 0-8 (includes table swap + drop)
+    uv run python migrations/schema_v2.py --swap   # Steps 0-8 (table swap + drop)
 """
 
 import argparse
@@ -19,8 +20,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from clippertv.data.turso_client import get_turso_client
-from clippertv.data.schema import seed_category_rules
+from clippertv.data.schema import seed_category_rules  # noqa: E402
+from clippertv.data.turso_client import get_turso_client  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).parent.parent
 BACKUP_PATH = PROJECT_ROOT / "backups" / "full_backup_trips.csv"
@@ -29,6 +30,7 @@ BACKUP_PATH = PROJECT_ROOT / "backups" / "full_backup_trips.csv"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _load_rider_to_account() -> dict[str, str]:
     """Build mapping from legacy rider_id aliases/cards to account numbers.
@@ -73,6 +75,7 @@ def _resolve(rider_id: str, mapping: dict[str, str]) -> str:
 # ---------------------------------------------------------------------------
 # Steps
 # ---------------------------------------------------------------------------
+
 
 def step0_verify_backups() -> None:
     """Step 0: Verify backup file exists on disk."""
@@ -163,7 +166,17 @@ def step2_migrate_csv(conn, mapping: dict[str, str]) -> int:
                (account_number, trip_id, start_datetime, end_datetime,
                 start_location, end_location, fare, operator, pass_type)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            [account, trip_id, txn_date, end_dt, start_loc, end_loc, fare, op, pass_type],
+            [
+                account,
+                trip_id,
+                txn_date,
+                end_dt,
+                start_loc,
+                end_loc,
+                fare,
+                op,
+                pass_type,
+            ],
         )
         inserted += 1
 
@@ -184,7 +197,10 @@ def step3_migrate_pdf(conn, mapping: dict[str, str]) -> int:
     ).fetchone()[0]
 
     if existing > csv_count:
-        print(f"  Skipped (trips_new has {existing} rows, beyond CSV count of {csv_count})")
+        print(
+            f"  Skipped (trips_new has {existing} rows,"
+            f" beyond CSV count of {csv_count})"
+        )
         return 0
 
     # Build transit_id -> name lookup
@@ -236,7 +252,7 @@ def step3_migrate_pdf(conn, mapping: dict[str, str]) -> int:
 
 
 def step4_migrate_manual(conn, mapping: dict[str, str]) -> int:
-    """Step 4: Migrate manual trips from both manual_trips table and source='manual' rows."""
+    """Step 4: Migrate manual trips from manual_trips table and source='manual' rows."""
     print("\n== Step 4: Migrate manual trips ==")
 
     existing = _table_count(conn, "manual_trips_new")
@@ -255,9 +271,6 @@ def step4_migrate_manual(conn, mapping: dict[str, str]) -> int:
 
     # Source 1: manual_trips table (canonical)
     if _table_exists(conn, "manual_trips"):
-        cols = {
-            r[1] for r in conn.execute("PRAGMA table_info(manual_trips)").fetchall()
-        }
         # Figure out the schema of the old manual_trips table
         mt_rows = conn.execute("SELECT * FROM manual_trips").fetchall()
         col_names = [
@@ -295,8 +308,17 @@ def step4_migrate_manual(conn, mapping: dict[str, str]) -> int:
                    (account_number, trip_id, start_datetime, end_datetime,
                     start_location, end_location, fare, operator, pass_type)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                [account, trip_id, txn_date, end_dt, start_loc, end_loc,
-                 fare, operator, pass_type],
+                [
+                    account,
+                    trip_id,
+                    txn_date,
+                    end_dt,
+                    start_loc,
+                    end_loc,
+                    fare,
+                    operator,
+                    pass_type,
+                ],
             )
             inserted += 1
 
@@ -311,8 +333,21 @@ def step4_migrate_manual(conn, mapping: dict[str, str]) -> int:
     print(f"  Found {len(manual_in_trips)} source='manual' rows in trips table")
 
     for row in manual_in_trips:
-        (rider_id, transit_id, txn_type, txn_date, location, debit,
-         trip_id, start_loc, end_loc, fare_val, op, pt, end_dt) = row
+        (
+            rider_id,
+            transit_id,
+            txn_type,
+            txn_date,
+            location,
+            debit,
+            trip_id,
+            start_loc,
+            end_loc,
+            fare_val,
+            op,
+            pt,
+            end_dt,
+        ) = row
 
         account = _resolve(rider_id, mapping)
         fare = fare_val if fare_val is not None else debit
@@ -342,8 +377,17 @@ def step4_migrate_manual(conn, mapping: dict[str, str]) -> int:
                (account_number, trip_id, start_datetime, end_datetime,
                 start_location, end_location, fare, operator, pass_type)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            [account, trip_id, txn_date, end_dt, start_loc, end_loc,
-             fare, operator, pass_type],
+            [
+                account,
+                trip_id,
+                txn_date,
+                end_dt,
+                start_loc,
+                end_loc,
+                fare,
+                operator,
+                pass_type,
+            ],
         )
         inserted += 1
 
@@ -388,8 +432,10 @@ def step6_verify(conn, mapping: dict[str, str]) -> None:
 
     # Check 2: manual_trips_new should have >= old manual count
     # (manual_trips table may add extras, but dedup could reduce)
-    print(f"  OK: manual_trips_new has {new_manual} rows "
-          f"(old manual sources: {old_manual_count} in trips + manual_trips table)")
+    print(
+        f"  OK: manual_trips_new has {new_manual} rows "
+        f"(old manual sources: {old_manual_count} in trips + manual_trips table)"
+    )
 
     # Check 3: Per-account counts
     print("\n  Per-account verification:")
@@ -454,11 +500,8 @@ def step6_verify(conn, mapping: dict[str, str]) -> None:
                     f"expected={expected_fare}, got={new_fare}"
                 )
         if not new_op:
-            sys.exit(
-                f"ABORT: Spot-check operator empty for old id={row_id}"
-            )
-        print(f"    id={row_id} ({source}): OK "
-              f"(fare={new_fare}, operator={new_op})")
+            sys.exit(f"ABORT: Spot-check operator empty for old id={row_id}")
+        print(f"    id={row_id} ({source}): OK (fare={new_fare}, operator={new_op})")
 
     print("\n  All verification checks passed.")
 
@@ -514,13 +557,14 @@ def step8_drop_old_tables(conn) -> None:
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Migrate to v2 schema")
     parser.add_argument(
         "--swap",
         action="store_true",
         help="Perform destructive table swap (steps 7-8). Without this flag, "
-             "only non-destructive prep (steps 0-6) runs.",
+        "only non-destructive prep (steps 0-6) runs.",
     )
     args = parser.parse_args()
 

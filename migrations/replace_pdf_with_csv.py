@@ -5,7 +5,6 @@ Requires env vars: TURSO_DATABASE_URL, TURSO_AUTH_TOKEN
 """
 
 import csv
-import os
 import sys
 from pathlib import Path
 
@@ -15,7 +14,10 @@ load_dotenv()
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.clippertv.data.turso_client import get_turso_client, initialize_database
+from src.clippertv.data.turso_client import (  # noqa: E402
+    get_turso_client,
+    initialize_database,
+)
 
 # Pattern 1: Midnight placeholder rows (Caltrain pass days, one-off transit entries)
 _MIDNIGHT_PLACEHOLDER_QUERY = """
@@ -28,7 +30,8 @@ _MIDNIGHT_PLACEHOLDER_QUERY = """
       AND source = 'pdf'
 """
 
-# Pattern 2: Unique transaction_type='manual' rows (hand-entered rides with no entry twin)
+# Pattern 2: Unique transaction_type='manual' rows
+# (hand-entered rides with no entry twin)
 _UNIQUE_MANUAL_TYPE_QUERY = """
     SELECT * FROM trips m
     WHERE m.transaction_type = 'manual'
@@ -75,13 +78,16 @@ def step0_preflight(conn) -> bool:
     print("\n=== Step 0: Pre-flight checks ===")
 
     pdf_2023_count = conn.execute(
-        "SELECT COUNT(*) FROM trips WHERE source = 'pdf' AND transaction_date >= '2023-01-01'"
+        "SELECT COUNT(*) FROM trips"
+        " WHERE source = 'pdf' AND transaction_date >= '2023-01-01'"
     ).fetchone()[0]
     already_deleted = pdf_2023_count == 0
 
     if already_deleted:
         try:
-            manual_backup = conn.execute("SELECT COUNT(*) FROM manual_trips").fetchone()[0]
+            manual_backup = conn.execute(
+                "SELECT COUNT(*) FROM manual_trips"
+            ).fetchone()[0]
             print(f"  Post-deletion re-run: manual_trips has {manual_backup} rows")
             if manual_backup != EXPECTED_MANUAL_COUNT:
                 print(f"  ERROR: Expected {EXPECTED_MANUAL_COUNT}")
@@ -137,7 +143,10 @@ def step1_export_manual_trips(conn) -> bool:
             print(f"  SKIP: manual_trips already has {existing} rows")
             return True
         elif existing > 0:
-            print(f"  WARNING: manual_trips has {existing} rows, expected {EXPECTED_MANUAL_COUNT}")
+            print(
+                f"  WARNING: manual_trips has {existing} rows,"
+                f" expected {EXPECTED_MANUAL_COUNT}"
+            )
             return False
     except Exception:
         pass
@@ -183,13 +192,16 @@ def step2_export_pdf_backup(conn) -> bool:
     if BACKUP_PATH.exists():
         with open(BACKUP_PATH) as f:
             reader = csv.reader(f)
-            header = next(reader)
+            next(reader)
             row_count = sum(1 for _ in reader)
         if row_count == EXPECTED_PDF_2023_COUNT:
             print(f"  SKIP: Backup already exists with {row_count} rows")
             return True
         else:
-            print(f"  WARNING: Backup exists but has {row_count} rows, expected {EXPECTED_PDF_2023_COUNT}")
+            print(
+                f"  WARNING: Backup exists but has {row_count} rows,"
+                f" expected {EXPECTED_PDF_2023_COUNT}"
+            )
             return False
 
     columns = get_column_names(conn)
@@ -205,7 +217,7 @@ def step2_export_pdf_backup(conn) -> bool:
 
     with open(BACKUP_PATH) as f:
         reader = csv.reader(f)
-        header = next(reader)
+        next(reader)
         row_count = sum(1 for _ in reader)
 
     print(f"  Exported {row_count} rows to {BACKUP_PATH}")
@@ -228,7 +240,10 @@ def step3_verification_gate(conn) -> bool:
         return False
 
     if manual_count != EXPECTED_MANUAL_COUNT:
-        print(f"  ERROR: manual_trips has {manual_count} rows, expected {EXPECTED_MANUAL_COUNT}")
+        print(
+            f"  ERROR: manual_trips has {manual_count} rows,"
+            f" expected {EXPECTED_MANUAL_COUNT}"
+        )
         return False
     print(f"  OK: manual_trips has {manual_count} rows")
 
@@ -242,7 +257,9 @@ def step3_verification_gate(conn) -> bool:
         row_count = sum(1 for _ in reader)
 
     if row_count != EXPECTED_PDF_2023_COUNT:
-        print(f"  ERROR: Backup has {row_count} rows, expected {EXPECTED_PDF_2023_COUNT}")
+        print(
+            f"  ERROR: Backup has {row_count} rows, expected {EXPECTED_PDF_2023_COUNT}"
+        )
         return False
     print(f"  OK: Backup file has {row_count} rows")
 
@@ -255,7 +272,8 @@ def step4_delete_pdf_rows(conn) -> bool:
     print("\n=== Step 4: Delete PDF rows (2023+) ===")
 
     count_before = conn.execute(
-        "SELECT COUNT(*) FROM trips WHERE source = 'pdf' AND transaction_date >= '2023-01-01'"
+        "SELECT COUNT(*) FROM trips"
+        " WHERE source = 'pdf' AND transaction_date >= '2023-01-01'"
     ).fetchone()[0]
 
     if count_before == 0:
@@ -268,7 +286,8 @@ def step4_delete_pdf_rows(conn) -> bool:
     conn.commit()
 
     count_after = conn.execute(
-        "SELECT COUNT(*) FROM trips WHERE source = 'pdf' AND transaction_date >= '2023-01-01'"
+        "SELECT COUNT(*) FROM trips"
+        " WHERE source = 'pdf' AND transaction_date >= '2023-01-01'"
     ).fetchone()[0]
 
     print(f"  Deleted {count_before} PDF rows (remaining: {count_after})")
@@ -295,17 +314,25 @@ def step5_download_and_ingest(conn) -> bool:
         " AND transaction_date < '2025-12-01'"
     ).fetchone()[0]
     if before_count > 0:
-        print(f"  Note: {before_count} CSV rows already exist in 2023-2025 range (will dedup)")
+        print(
+            f"  Note: {before_count} CSV rows already exist"
+            " in 2023-2025 range (will dedup)"
+        )
 
     project_root = Path(__file__).parent.parent
     result = subprocess.run(
         [
-            "uv", "run", "clipper-download",
+            "uv",
+            "run",
+            "clipper-download",
             "--all",
-            "--start", "2023-01-01",
-            "--end", "2025-11-30",
+            "--start",
+            "2023-01-01",
+            "--end",
+            "2025-11-30",
             "--ingest",
-            "--config", str(project_root / "clipper.toml"),
+            "--config",
+            str(project_root / "clipper.toml"),
         ],
         cwd=str(project_root),
     )
@@ -336,7 +363,9 @@ def step6_reimport_manual_trips(conn) -> bool:
         "SELECT COUNT(*) FROM trips WHERE source = 'manual'"
     ).fetchone()[0]
     if existing_manual > 0:
-        print(f"  Clearing {existing_manual} existing source='manual' rows (idempotency)")
+        print(
+            f"  Clearing {existing_manual} existing source='manual' rows (idempotency)"
+        )
         conn.execute("DELETE FROM trips WHERE source = 'manual'")
 
     columns = get_column_names(conn)
@@ -344,8 +373,6 @@ def step6_reimport_manual_trips(conn) -> bool:
         "SELECT * FROM manual_trips WHERE transaction_date >= '2023-01-01'"
     ).fetchall()
     print(f"  Found {len(rows)} manual rows (2023+) to re-import")
-
-    source_idx = columns.index("source")
 
     insert_columns = [c for c in columns if c != "id"]
     placeholders = ", ".join(["?"] * len(insert_columns))
@@ -430,7 +457,8 @@ def main() -> int:
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--delete", action="store_true",
+        "--delete",
+        action="store_true",
         help="Proceed with deletion and re-ingestion (Steps 4-7)",
     )
     args = parser.parse_args()

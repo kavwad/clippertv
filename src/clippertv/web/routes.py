@@ -26,7 +26,8 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 RIDER_COLORS = ["#0099CC", "#00A55E", "#FDB813", "#BA0C2F", "#6C6C6C", "#4DD0E1"]
 
 _account_map: dict[str, list[str]] | None = None
-_display_categories: list[str] | None | bool = False  # False = not loaded
+_display_categories: list[str] | None = None
+_display_categories_loaded: bool = False
 _ql: QueryLayer | None = None
 
 
@@ -62,9 +63,10 @@ def get_riders() -> list[str]:
 
 
 def _keep_categories() -> list[str] | None:
-    global _display_categories
-    if _display_categories is False:
+    global _display_categories, _display_categories_loaded
+    if not _display_categories_loaded:
         _display_categories = load_display_categories()
+        _display_categories_loaded = True
     return _display_categories
 
 
@@ -85,18 +87,16 @@ def _dashboard_context(rider: str) -> dict:
     prev_period = all_periods[-2] if len(all_periods) > 1 else None
 
     current_buckets = (
-        [b for b in monthly if b.period == current_period]
-        if current_period
-        else []
+        [b for b in monthly if b.period == current_period] if current_period else []
     )
     prev_buckets = (
-        [b for b in monthly if b.period == prev_period]
-        if prev_period
-        else []
+        [b for b in monthly if b.period == prev_period] if prev_period else []
     )
     recent_date = ql.most_recent_date(accounts)
     stats = compute_summary(
-        current_buckets, prev_buckets, most_recent_date=recent_date,
+        current_buckets,
+        prev_buckets,
+        most_recent_date=recent_date,
     )
 
     most_used_count = 0
@@ -109,17 +109,14 @@ def _dashboard_context(rider: str) -> dict:
     yearly = collapse_categories(raw_yearly, keep=keep)
     pass_m = ql.pass_months(accounts)
     yearly_cost = collapse_categories(
-        apply_pass_costs(raw_yearly, pass_m), keep=keep,
+        apply_pass_costs(raw_yearly, pass_m),
+        keep=keep,
     )
 
-    recent_dt = (
-        datetime.strptime(recent_date, "%Y-%m-%d") if recent_date else None
-    )
+    recent_dt = datetime.strptime(recent_date, "%Y-%m-%d") if recent_date else None
     year_str = str(recent_dt.year if recent_dt else datetime.now().year)
 
-    yearly_trip_total = sum(
-        b.count for b in yearly if b.period == year_str
-    )
+    yearly_trip_total = sum(b.count for b in yearly if b.period == year_str)
     yearly_cost_total = round(
         sum(b.total_fare for b in yearly_cost if b.period == year_str),
     )
@@ -149,10 +146,16 @@ async def dashboard(request: Request, rider: str = ""):
     """Render the main dashboard page."""
     riders = get_riders()
     if not riders:
-        return templates.TemplateResponse(request, "dashboard.html", {
-            "rider": None, "riders": [], "stats": None,
-            "color_map": config.transit_categories.color_map,
-        })
+        return templates.TemplateResponse(
+            request,
+            "dashboard.html",
+            {
+                "rider": None,
+                "riders": [],
+                "stats": None,
+                "color_map": config.transit_categories.color_map,
+            },
+        )
     if rider not in riders:
         rider = riders[0]
 
@@ -167,7 +170,8 @@ async def dashboard_partial(request: Request, rider: str = ""):
     riders = get_riders()
     if not riders:
         return templates.TemplateResponse(
-            request, "partials/dashboard_content.html",
+            request,
+            "partials/dashboard_content.html",
             {"rider": None, "stats": None},
         )
     if rider not in riders:
@@ -175,7 +179,9 @@ async def dashboard_partial(request: Request, rider: str = ""):
 
     ctx = _dashboard_context(rider)
     return templates.TemplateResponse(
-        request, "partials/dashboard_content.html", ctx,
+        request,
+        "partials/dashboard_content.html",
+        ctx,
     )
 
 
@@ -229,17 +235,17 @@ async def get_comparison_data():
 
     for i, name in enumerate(riders):
         color = RIDER_COLORS[i % len(RIDER_COLORS)]
-        rider_points = {
-            p.period: p.count for p in points if p.rider_name == name
-        }
-        datasets.append({
-            "label": name,
-            "data": [rider_points.get(p, 0) for p in periods],
-            "borderColor": color,
-            "backgroundColor": color,
-            "fill": False,
-            "tension": 0.3,
-        })
+        rider_points = {p.period: p.count for p in points if p.rider_name == name}
+        datasets.append(
+            {
+                "label": name,
+                "data": [rider_points.get(p, 0) for p in periods],
+                "borderColor": color,
+                "backgroundColor": color,
+                "fill": False,
+                "tension": 0.3,
+            }
+        )
 
     return {"labels": labels, "datasets": datasets}
 
@@ -254,13 +260,15 @@ def _table_context(rider: str) -> dict:
     raw_monthly = ql.monthly_by_category(accounts, include_manual=True)
     monthly = collapse_categories(raw_monthly, keep=keep)
     monthly_cost = collapse_categories(
-        apply_pass_costs(raw_monthly, pass_m), keep=keep,
+        apply_pass_costs(raw_monthly, pass_m),
+        keep=keep,
     )
 
     raw_yearly = ql.yearly_by_category(accounts, include_manual=True)
     yearly = collapse_categories(raw_yearly, keep=keep)
     yearly_cost = collapse_categories(
-        apply_pass_costs(raw_yearly, pass_m), keep=keep,
+        apply_pass_costs(raw_yearly, pass_m),
+        keep=keep,
     )
 
     return {
@@ -281,7 +289,9 @@ async def get_table_data(rider: str):
 async def get_table_html(request: Request, rider: str):
     """Return pre-rendered table HTML for HTMX swap."""
     return templates.TemplateResponse(
-        request, "partials/tables.html", _table_context(rider),
+        request,
+        "partials/tables.html",
+        _table_context(rider),
     )
 
 
@@ -298,9 +308,11 @@ def _format_period(period: str) -> str:
 
 
 def _pivot_buckets(
-    buckets: list[AggregateBucket], value: str,
+    buckets: list[AggregateBucket],
+    value: str,
 ) -> tuple[dict[str, dict[str, float]], list[str]]:
-    """Group buckets into a period → category → value dict, preserving category order."""
+    """Group buckets into a period->category->value dict,
+    preserving category order."""
     by_period: dict[str, dict[str, float]] = defaultdict(dict)
     seen: set[str] = set()
     categories: list[str] = []
@@ -308,14 +320,14 @@ def _pivot_buckets(
         if b.category not in seen:
             seen.add(b.category)
             categories.append(b.category)
-        by_period[b.period][b.category] = (
-            b.total_fare if value == "fare" else b.count
-        )
+        by_period[b.period][b.category] = b.total_fare if value == "fare" else b.count
     return by_period, categories
 
 
 def _buckets_to_chartjs(
-    buckets: list[AggregateBucket], *, value: str,
+    buckets: list[AggregateBucket],
+    *,
+    value: str,
 ) -> dict:
     """Convert AggregateBuckets to Chart.js format."""
     by_period, categories = _pivot_buckets(buckets, value)
@@ -328,17 +340,20 @@ def _buckets_to_chartjs(
         data = [by_period[p].get(cat, 0) for p in periods]
         if value == "fare":
             data = [round(v, 2) for v in data]
-        datasets.append({
-            "label": cat,
-            "data": data,
-            "backgroundColor": color,
-        })
+        datasets.append(
+            {
+                "label": cat,
+                "data": data,
+                "backgroundColor": color,
+            }
+        )
 
     return {"labels": labels, "datasets": datasets}
 
 
 def _buckets_to_table(
-    buckets: list[AggregateBucket], value_type: str,
+    buckets: list[AggregateBucket],
+    value_type: str,
 ) -> dict:
     """Convert AggregateBuckets to table format for the frontend."""
     by_period, categories = _pivot_buckets(buckets, value_type)

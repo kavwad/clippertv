@@ -6,15 +6,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
 
-from clippertv.web.routes import router
+from clippertv.web.routes import router  # noqa: E402
 
 app = FastAPI(title="ClipperTV", description="Transit trip dashboard")
 
 # Static files
-app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
+app.mount(
+    "/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static"
+)
 
 # Include routes
 app.include_router(router)
@@ -23,6 +25,7 @@ app.include_router(router)
 def run():
     """Run the FastAPI app with uvicorn."""
     import uvicorn
+
     uvicorn.run("clippertv.web.main:app", host="0.0.0.0", port=8000, reload=True)
 
 

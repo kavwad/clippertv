@@ -1,6 +1,5 @@
 """Database migration script for Phase 1: Multi-User Backend."""
 
-import os
 import sys
 from pathlib import Path
 
@@ -86,7 +85,10 @@ def run_migration():
         print(f"   ⚠ Warning: {e}")
 
     try:
-        client.execute("CREATE INDEX IF NOT EXISTS clipper_cards_user_id_idx ON clipper_cards(user_id)")
+        client.execute(
+            "CREATE INDEX IF NOT EXISTS clipper_cards_user_id_idx"
+            " ON clipper_cards(user_id)"
+        )
         print("   ✓ Created index on clipper_cards.user_id")
     except Exception as e:
         print(f"   ⚠ Warning: {e}")
@@ -129,7 +131,11 @@ def run_migration():
     print("✓ Migration completed successfully!")
     print("\nNext steps:")
     print("1. Generate JWT_SECRET_KEY: openssl rand -hex 32")
-    print("2. Generate ENCRYPTION_KEY: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"")
+    print(
+        "2. Generate ENCRYPTION_KEY: python -c"
+        ' "from cryptography.fernet import Fernet;'
+        ' print(Fernet.generate_key().decode())"'
+    )
     print("3. Add these to your .env file")
 
 

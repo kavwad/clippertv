@@ -6,7 +6,6 @@ from datetime import datetime
 
 from clippertv.data.domain import AggregateBucket, Trip
 
-
 _CATEGORY_JOIN = """
     LEFT JOIN category_rules cr_exact
         ON cr_exact.operator = t.operator
@@ -30,23 +29,33 @@ class QueryLayer:
         self.conn = conn
 
     def monthly_by_category(
-        self, account_numbers: list[str], *, include_manual: bool = False,
+        self,
+        account_numbers: list[str],
+        *,
+        include_manual: bool = False,
     ) -> list[AggregateBucket]:
         """Monthly trip counts and fare sums, grouped by derived category."""
         return self._aggregate_by_category("%Y-%m", account_numbers, include_manual)
 
     def yearly_by_category(
-        self, account_numbers: list[str], *, include_manual: bool = False,
+        self,
+        account_numbers: list[str],
+        *,
+        include_manual: bool = False,
     ) -> list[AggregateBucket]:
         """Yearly trip counts and fare sums, grouped by derived category."""
         return self._aggregate_by_category("%Y", account_numbers, include_manual)
 
     def _aggregate_by_category(
-        self, time_fmt: str, account_numbers: list[str], include_manual: bool,
+        self,
+        time_fmt: str,
+        account_numbers: list[str],
+        include_manual: bool,
     ) -> list[AggregateBucket]:
         source = self._source_clause(account_numbers, include_manual)
         query = f"""
-            SELECT period, category, COUNT(*) AS count, COALESCE(SUM(fare), 0.0) AS total_fare
+            SELECT period, category,
+                   COUNT(*) AS count, COALESCE(SUM(fare), 0.0) AS total_fare
             FROM (
                 SELECT
                     strftime('{time_fmt}', t.start_datetime) AS period,
@@ -60,7 +69,10 @@ class QueryLayer:
         """
         params = account_numbers * (2 if include_manual else 1)
         rows = self.conn.execute(query, params).fetchall()
-        return [AggregateBucket(period=r[0], category=r[1], count=r[2], total_fare=r[3]) for r in rows]
+        return [
+            AggregateBucket(period=r[0], category=r[1], count=r[2], total_fare=r[3])
+            for r in rows
+        ]
 
     def pass_months(self, account_numbers: list[str]) -> set[str]:
         """Return set of YYYY-MM strings where rider had a Monthly pass.
@@ -72,9 +84,11 @@ class QueryLayer:
         query = f"""
             SELECT DISTINCT strftime('%Y-%m', start_datetime) AS period
             FROM (
-                SELECT start_datetime, pass_type FROM trips WHERE account_number IN ({ph})
+                SELECT start_datetime, pass_type
+                FROM trips WHERE account_number IN ({ph})
                 UNION ALL
-                SELECT start_datetime, pass_type FROM manual_trips WHERE account_number IN ({ph})
+                SELECT start_datetime, pass_type
+                FROM manual_trips WHERE account_number IN ({ph})
             )
             WHERE pass_type LIKE '%Monthly%'
         """
@@ -110,11 +124,16 @@ class QueryLayer:
         rows = self.conn.execute(query, account_numbers).fetchall()
         return [
             Trip(
-                id=r[0], account_number=r[1], trip_id=r[2],
+                id=r[0],
+                account_number=r[1],
+                trip_id=r[2],
                 start_datetime=datetime.fromisoformat(r[3]),
                 end_datetime=datetime.fromisoformat(r[4]) if r[4] else None,
-                start_location=r[5], end_location=r[6],
-                fare=r[7], operator=r[8], pass_type=r[9],
+                start_location=r[5],
+                end_location=r[6],
+                fare=r[7],
+                operator=r[8],
+                pass_type=r[9],
                 category=r[10],
             )
             for r in rows
@@ -124,7 +143,8 @@ class QueryLayer:
         """Return ISO date string of the most recent trip."""
         ph = _placeholders(len(account_numbers))
         row = self.conn.execute(
-            f"SELECT MAX(DATE(start_datetime)) FROM trips WHERE account_number IN ({ph})",
+            f"SELECT MAX(DATE(start_datetime)) FROM trips"
+            f" WHERE account_number IN ({ph})",
             account_numbers,
         ).fetchone()
         return row[0] if row and row[0] else None
@@ -134,4 +154,7 @@ class QueryLayer:
         base = f"SELECT * FROM trips WHERE account_number IN ({ph})"
         if not include_manual:
             return base
-        return f"{base} UNION ALL SELECT * FROM manual_trips WHERE account_number IN ({ph})"
+        return (
+            f"{base} UNION ALL"
+            f" SELECT * FROM manual_trips WHERE account_number IN ({ph})"
+        )

@@ -17,10 +17,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-import pandas as pd
-import requests
-from bs4 import BeautifulSoup
-import tomllib
+import tomllib  # noqa: E402
+
+import pandas as pd  # noqa: E402
+import requests  # noqa: E402
+from bs4 import BeautifulSoup  # noqa: E402
 
 HOST = "https://www.clippercard.com"
 USER_AGENT = "clipper-downloader/0.3"
@@ -142,7 +143,7 @@ def login(session: requests.Session, email: str, password: str) -> requests.Sess
     if resp2.status_code not in (200, 302):
         raise RuntimeError(f"Could not login: {resp2.status_code}")
 
-    setattr(session, "csrf_token", find_csrf_token(resp2.text))
+    session.csrf_token = find_csrf_token(resp2.text)  # type: ignore[attr-defined]
     return session
 
 
@@ -218,8 +219,9 @@ def download_csv(
 
     if resp.status_code == 404:
         raise RuntimeError(
-            f"CSV download endpoint returned 404. This is a known Clipper server issue. "
-            f"Response: {resp.text[:200]}"
+            "CSV download endpoint returned 404."
+            " This is a known Clipper server issue."
+            f" Response: {resp.text[:200]}"
         )
     if resp.status_code != 200:
         raise RuntimeError(
@@ -228,8 +230,9 @@ def download_csv(
 
     if not resp.text:
         raise RuntimeError(
-            "CSV download returned empty content. This appears to be a Clipper server issue. "
-            "The endpoint exists but is not returning data."
+            "CSV download returned empty content."
+            " This appears to be a Clipper server issue."
+            " The endpoint exists but is not returning data."
         )
 
     return resp.text
@@ -378,7 +381,8 @@ def _parse_args() -> argparse.Namespace:
         "--ingest-file",
         dest="ingest_file",
         nargs="+",
-        help="Ingest one or more existing CSV files into the data store (skips download)",
+        help="Ingest one or more existing CSV files into the data store"
+        " (skips download)",
     )
     return parser.parse_args()
 

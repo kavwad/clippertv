@@ -1,11 +1,14 @@
 """Integration tests for user store."""
 
+from uuid import uuid4
+
 import pytest
-from clippertv.data.user_store import UserStore
-from clippertv.data.models import UserCreate, ClipperCardCreate
-from clippertv.auth.service import AuthService
+
 from clippertv.auth.crypto import CredentialEncryption
+from clippertv.auth.service import AuthService
+from clippertv.data.models import ClipperCardCreate, UserCreate
 from clippertv.data.turso_client import get_turso_client
+from clippertv.data.user_store import UserStore
 
 
 @pytest.fixture
@@ -34,25 +37,21 @@ def crypto_service():
 @pytest.fixture
 def user_store(db_client, auth_service, crypto_service):
     """Create user store for testing."""
-    return UserStore(
-        client=db_client,
-        auth_service=auth_service,
-        crypto=crypto_service
-    )
+    return UserStore(client=db_client, auth_service=auth_service, crypto=crypto_service)
+
+
+def _unique_email(prefix: str = "test") -> str:
+    return f"{prefix}_{uuid4().hex[:8]}@example.com"
 
 
 @pytest.fixture
 def test_user_data():
     """Create test user data."""
     return UserCreate(
-        email=f"test_{pytest.test_counter}@example.com",
+        email=_unique_email("test"),
         password="secure_password_123",
-        name="Test User"
+        name="Test User",
     )
-
-
-# Counter for unique test emails
-pytest.test_counter = 0
 
 
 class TestUserStore:
@@ -60,8 +59,6 @@ class TestUserStore:
 
     def test_create_user(self, user_store, test_user_data):
         """Test creating a new user."""
-        pytest.test_counter += 1
-
         user = user_store.create_user(test_user_data)
 
         assert user.id
@@ -72,12 +69,10 @@ class TestUserStore:
 
     def test_create_duplicate_user_raises_error(self, user_store):
         """Test that creating duplicate user raises error."""
-        pytest.test_counter += 1
-
         user_data = UserCreate(
-            email=f"duplicate_{pytest.test_counter}@example.com",
+            email=_unique_email("duplicate"),
             password="password123",
-            name="Duplicate User"
+            name="Duplicate User",
         )
 
         # Create first user
@@ -89,13 +84,11 @@ class TestUserStore:
 
     def test_get_user_by_email(self, user_store):
         """Test retrieving user by email."""
-        pytest.test_counter += 1
-
         # Create user
         user_data = UserCreate(
-            email=f"findme_{pytest.test_counter}@example.com",
+            email=_unique_email("findme"),
             password="password123",
-            name="Find Me"
+            name="Find Me",
         )
         created_user = user_store.create_user(user_data)
 
@@ -113,13 +106,8 @@ class TestUserStore:
 
     def test_get_user_by_id(self, user_store):
         """Test retrieving user by ID."""
-        pytest.test_counter += 1
-
         # Create user
-        user_data = UserCreate(
-            email=f"findbyid_{pytest.test_counter}@example.com",
-            password="password123"
-        )
+        user_data = UserCreate(email=_unique_email("findbyid"), password="password123")
         created_user = user_store.create_user(user_data)
 
         # Retrieve user by ID
@@ -131,19 +119,16 @@ class TestUserStore:
 
     def test_verify_user_credentials_success(self, user_store):
         """Test successful credential verification."""
-        pytest.test_counter += 1
-
         # Create user
         user_data = UserCreate(
-            email=f"verify_{pytest.test_counter}@example.com",
-            password="correct_password"
+            email=_unique_email("verify"),
+            password="correct_password",
         )
         created_user = user_store.create_user(user_data)
 
         # Verify correct credentials
         verified_user = user_store.verify_user_credentials(
-            email=user_data.email,
-            password="correct_password"
+            email=user_data.email, password="correct_password"
         )
 
         assert verified_user is not None
@@ -151,19 +136,16 @@ class TestUserStore:
 
     def test_verify_user_credentials_wrong_password(self, user_store):
         """Test credential verification with wrong password."""
-        pytest.test_counter += 1
-
         # Create user
         user_data = UserCreate(
-            email=f"wrongpass_{pytest.test_counter}@example.com",
-            password="correct_password"
+            email=_unique_email("wrongpass"),
+            password="correct_password",
         )
         user_store.create_user(user_data)
 
         # Verify with wrong password
         verified_user = user_store.verify_user_credentials(
-            email=user_data.email,
-            password="wrong_password"
+            email=user_data.email, password="wrong_password"
         )
 
         assert verified_user is None
@@ -171,8 +153,7 @@ class TestUserStore:
     def test_verify_user_credentials_nonexistent_email(self, user_store):
         """Test credential verification with non-existent email."""
         verified_user = user_store.verify_user_credentials(
-            email="nonexistent@example.com",
-            password="any_password"
+            email="nonexistent@example.com", password="any_password"
         )
 
         assert verified_user is None
@@ -183,20 +164,13 @@ class TestClipperCardStore:
 
     def test_add_clipper_card(self, user_store):
         """Test adding a Clipper card to a user."""
-        pytest.test_counter += 1
-
         # Create user first
-        user_data = UserCreate(
-            email=f"carduser_{pytest.test_counter}@example.com",
-            password="password123"
-        )
+        user_data = UserCreate(email=_unique_email("carduser"), password="password123")
         user = user_store.create_user(user_data)
 
         # Add clipper card
         card_data = ClipperCardCreate(
-            card_number="123456789",
-            rider_name="Test Card",
-            is_primary=True
+            card_number="123456789", rider_name="Test Card", is_primary=True
         )
         card = user_store.add_clipper_card(user.id, card_data)
 
@@ -208,20 +182,15 @@ class TestClipperCardStore:
 
     def test_add_clipper_card_with_credentials(self, user_store):
         """Test adding Clipper card with encrypted credentials."""
-        pytest.test_counter += 1
-
         # Create user
-        user_data = UserCreate(
-            email=f"credcard_{pytest.test_counter}@example.com",
-            password="password123"
-        )
+        user_data = UserCreate(email=_unique_email("credcard"), password="password123")
         user = user_store.create_user(user_data)
 
         # Add card with credentials
         card_data = ClipperCardCreate(
             card_number="987654321",
             rider_name="Card with Creds",
-            credentials={"username": "clipper_user", "password": "clipper_pass"}
+            credentials={"username": "clipper_user", "password": "clipper_pass"},
         )
         card = user_store.add_clipper_card(user.id, card_data)
 
@@ -235,20 +204,12 @@ class TestClipperCardStore:
 
     def test_add_duplicate_card_raises_error(self, user_store):
         """Test that adding duplicate card raises error."""
-        pytest.test_counter += 1
-
         # Create user
-        user_data = UserCreate(
-            email=f"dupcard_{pytest.test_counter}@example.com",
-            password="password123"
-        )
+        user_data = UserCreate(email=_unique_email("dupcard"), password="password123")
         user = user_store.create_user(user_data)
 
         # Add first card
-        card_data = ClipperCardCreate(
-            card_number="111222333",
-            rider_name="First Card"
-        )
+        card_data = ClipperCardCreate(card_number="111222333", rider_name="First Card")
         user_store.add_clipper_card(user.id, card_data)
 
         # Attempt to add duplicate
@@ -257,25 +218,19 @@ class TestClipperCardStore:
 
     def test_get_user_clipper_cards(self, user_store):
         """Test retrieving all cards for a user."""
-        pytest.test_counter += 1
-
         # Create user
         user_data = UserCreate(
-            email=f"multicards_{pytest.test_counter}@example.com",
-            password="password123"
+            email=_unique_email("multicards"),
+            password="password123",
         )
         user = user_store.create_user(user_data)
 
         # Add multiple cards
         card1 = ClipperCardCreate(
-            card_number="111111111",
-            rider_name="Card 1",
-            is_primary=False
+            card_number="111111111", rider_name="Card 1", is_primary=False
         )
         card2 = ClipperCardCreate(
-            card_number="222222222",
-            rider_name="Card 2",
-            is_primary=True
+            card_number="222222222", rider_name="Card 2", is_primary=True
         )
 
         user_store.add_clipper_card(user.id, card1)
@@ -291,25 +246,19 @@ class TestClipperCardStore:
 
     def test_update_primary_card(self, user_store):
         """Test updating primary card status."""
-        pytest.test_counter += 1
-
         # Create user
         user_data = UserCreate(
-            email=f"primarycard_{pytest.test_counter}@example.com",
-            password="password123"
+            email=_unique_email("primarycard"),
+            password="password123",
         )
         user = user_store.create_user(user_data)
 
         # Add two cards
         card1_data = ClipperCardCreate(
-            card_number="333333333",
-            rider_name="Card 1",
-            is_primary=True
+            card_number="333333333", rider_name="Card 1", is_primary=True
         )
         card2_data = ClipperCardCreate(
-            card_number="444444444",
-            rider_name="Card 2",
-            is_primary=False
+            card_number="444444444", rider_name="Card 2", is_primary=False
         )
 
         card1 = user_store.add_clipper_card(user.id, card1_data)
@@ -327,19 +276,16 @@ class TestClipperCardStore:
 
     def test_delete_clipper_card(self, user_store):
         """Test deleting a Clipper card."""
-        pytest.test_counter += 1
-
         # Create user
         user_data = UserCreate(
-            email=f"deletecard_{pytest.test_counter}@example.com",
-            password="password123"
+            email=_unique_email("deletecard"),
+            password="password123",
         )
         user = user_store.create_user(user_data)
 
         # Add card
         card_data = ClipperCardCreate(
-            card_number="555555555",
-            rider_name="Card to Delete"
+            card_number="555555555", rider_name="Card to Delete"
         )
         card = user_store.add_clipper_card(user.id, card_data)
 

@@ -18,9 +18,16 @@ def create_tables(conn) -> None:
             created_at      TEXT DEFAULT (datetime('now'))
         )
     """)
-    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_id ON trips(trip_id) WHERE trip_id IS NOT NULL")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_account_number ON trips(account_number)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_start_datetime ON trips(start_datetime)")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_id"
+        " ON trips(trip_id) WHERE trip_id IS NOT NULL"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_account_number ON trips(account_number)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_start_datetime ON trips(start_datetime)"
+    )
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS manual_trips (
@@ -46,34 +53,63 @@ def create_tables(conn) -> None:
             category  TEXT NOT NULL
         )
     """)
-    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_category_rule ON category_rules(operator, location)")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_category_rule"
+        " ON category_rules(operator, location)"
+    )
     conn.commit()
 
 
 # --- Seed data from current categories.py frozensets ---
 
 _MUNI_METRO_STATIONS = [
-    "Embarcadero", "Montgomery", "Powell", "Civic Center",
-    "Van Ness", "Church", "Castro", "Forest Hill",
-    "West Portal", "Balboa Park",
-    "Sunset Tunnel East", "Sunset Tunnel West",
-    "Duboce/Church", "Duboce/Noe",
-    "Carl/Cole", "Carl/Hillway",
-    "Judah/9th Ave", "Judah/19th Ave",
-    "Taraval/19th Ave", "Taraval/32nd Ave",
-    "SF State", "Stonestown", "Parkmerced",
-    "Ocean/San Jose", "Ocean/Geneva",
-    "4th/King", "4th/Brannan",
-    "Sunnydale", "Bayshore/Arleta",
-    "3rd/20th", "3rd/Carroll",
+    "Embarcadero",
+    "Montgomery",
+    "Powell",
+    "Civic Center",
+    "Van Ness",
+    "Church",
+    "Castro",
+    "Forest Hill",
+    "West Portal",
+    "Balboa Park",
+    "Sunset Tunnel East",
+    "Sunset Tunnel West",
+    "Duboce/Church",
+    "Duboce/Noe",
+    "Carl/Cole",
+    "Carl/Hillway",
+    "Judah/9th Ave",
+    "Judah/19th Ave",
+    "Taraval/19th Ave",
+    "Taraval/32nd Ave",
+    "SF State",
+    "Stonestown",
+    "Parkmerced",
+    "Ocean/San Jose",
+    "Ocean/Geneva",
+    "4th/King",
+    "4th/Brannan",
+    "Sunnydale",
+    "Bayshore/Arleta",
+    "3rd/20th",
+    "3rd/Carroll",
 ]
 
 _CABLE_CAR_STOPS = [
-    "Hyde/Beach", "Hyde/Lombard", "Hyde/Greenwich",
-    "Hyde/Union", "Hyde/Jackson", "Hyde/California",
-    "Powell/Market", "Powell/Mason", "Powell/Hyde",
-    "Mason/Washington", "Mason/Jackson",
-    "California/Van Ness", "California/Powell",
+    "Hyde/Beach",
+    "Hyde/Lombard",
+    "Hyde/Greenwich",
+    "Hyde/Union",
+    "Hyde/Jackson",
+    "Hyde/California",
+    "Powell/Market",
+    "Powell/Mason",
+    "Powell/Hyde",
+    "Mason/Washington",
+    "Mason/Jackson",
+    "California/Van Ness",
+    "California/Powell",
     "California/Drumm",
 ]
 

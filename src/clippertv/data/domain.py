@@ -7,6 +7,7 @@ from datetime import datetime
 @dataclass(frozen=True)
 class Trip:
     """Single trip record from the database."""
+
     id: int
     account_number: str
     trip_id: str | None
@@ -23,7 +24,8 @@ class Trip:
 @dataclass(frozen=True)
 class AggregateBucket:
     """A single cell in an aggregation: period × category → value."""
-    period: str        # "2026-03", "2026", etc.
+
+    period: str  # "2026-03", "2026", etc.
     category: str
     count: int
     total_fare: float
@@ -32,6 +34,7 @@ class AggregateBucket:
 @dataclass(frozen=True)
 class RiderSummary:
     """Summary statistics for a rider over a time range."""
+
     trips_this_month: int
     cost_this_month: float
     trip_diff: int
@@ -45,6 +48,7 @@ class RiderSummary:
 @dataclass(frozen=True)
 class ComparisonPoint:
     """Single data point in a cross-rider comparison."""
+
     period: str
     rider_name: str
     count: int

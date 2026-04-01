@@ -4,7 +4,6 @@ import hashlib
 import os
 import tomllib
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -36,15 +35,13 @@ def _hsl_to_hex(h: int, s: int, l: int) -> str:  # noqa: E741
         r, g, b = x, 0, c
     else:
         r, g, b = c, 0, x
-    return "#{:02X}{:02X}{:02X}".format(
-        int((r + m) * 255), int((g + m) * 255), int((b + m) * 255),
-    )
+    return f"#{int((r + m) * 255):02X}{int((g + m) * 255):02X}{int((b + m) * 255):02X}"
 
 
 class TransitCategories(BaseModel):
     """Transit category display configuration."""
 
-    color_map: Dict[str, str] = {
+    color_map: dict[str, str] = {
         "Muni Bus": "#BA0C2F",
         "Muni Metro": "#FDB813",
         "BART": "#0099D8",
@@ -78,20 +75,20 @@ class EnvConfig:
     """Environment-based configuration for authentication and database."""
 
     # Database
-    TURSO_DATABASE_URL: Optional[str] = os.getenv("TURSO_DATABASE_URL")
-    TURSO_AUTH_TOKEN: Optional[str] = os.getenv("TURSO_AUTH_TOKEN")
+    TURSO_DATABASE_URL: str | None = os.getenv("TURSO_DATABASE_URL")
+    TURSO_AUTH_TOKEN: str | None = os.getenv("TURSO_AUTH_TOKEN")
 
     # Authentication
-    JWT_SECRET_KEY: Optional[str] = os.getenv("JWT_SECRET_KEY")
+    JWT_SECRET_KEY: str | None = os.getenv("JWT_SECRET_KEY")
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRY_DAYS: int = 7
 
     # Encryption
-    ENCRYPTION_KEY: Optional[str] = os.getenv("ENCRYPTION_KEY")
+    ENCRYPTION_KEY: str | None = os.getenv("ENCRYPTION_KEY")
 
     # Email (for Phase 1.5)
     EMAIL_PROVIDER: str = os.getenv("EMAIL_PROVIDER", "resend")
-    EMAIL_API_KEY: Optional[str] = os.getenv("EMAIL_API_KEY")
+    EMAIL_API_KEY: str | None = os.getenv("EMAIL_API_KEY")
     EMAIL_FROM: str = os.getenv("EMAIL_FROM", "ClipperTV <reports@clippertv.app>")
 
     # App
@@ -133,14 +130,16 @@ class EnvConfig:
                 f"Missing required auth config: {', '.join(missing)}\n"
                 "Generate keys with:\n"
                 "  JWT_SECRET_KEY: openssl rand -hex 32\n"
-                "  ENCRYPTION_KEY: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+                "  ENCRYPTION_KEY: python -c"
+                ' "from cryptography.fernet import Fernet;'
+                ' print(Fernet.generate_key().decode())"'
             )
 
 
 env_config = EnvConfig()
 
 
-def load_display_categories(config_path: str = "clipper.toml") -> Optional[List[str]]:
+def load_display_categories(config_path: str = "clipper.toml") -> list[str] | None:
     """Load explicit display categories from clipper.toml, if configured."""
     path = Path(config_path)
     if not path.exists():
@@ -152,7 +151,7 @@ def load_display_categories(config_path: str = "clipper.toml") -> Optional[List[
     return list(cats) if cats else None
 
 
-def load_rider_mapping(config_path: str = "clipper.toml") -> Dict[str, str]:
+def load_rider_mapping(config_path: str = "clipper.toml") -> dict[str, str]:
     """Build rider_id → display name mapping from clipper.toml.
 
     Maps card numbers, account numbers, and aliases to the rider name.
@@ -162,7 +161,7 @@ def load_rider_mapping(config_path: str = "clipper.toml") -> Dict[str, str]:
         return {}
     with open(path, "rb") as f:
         data = tomllib.load(f)
-    mapping: Dict[str, str] = {}
+    mapping: dict[str, str] = {}
     for account in data.get("accounts", []):
         name = account["name"]
         for key in ("cards", "accounts", "aliases"):
@@ -171,7 +170,7 @@ def load_rider_mapping(config_path: str = "clipper.toml") -> Dict[str, str]:
     return mapping
 
 
-def load_account_mapping(config_path: str = "clipper.toml") -> Dict[str, List[str]]:
+def load_account_mapping(config_path: str = "clipper.toml") -> dict[str, list[str]]:
     """Build display name → account numbers mapping from clipper.toml.
 
     Returns a dict like {"kaveh": ["100005510894", "100005510902"], ...}.
@@ -181,7 +180,7 @@ def load_account_mapping(config_path: str = "clipper.toml") -> Dict[str, List[st
         return {}
     with open(path, "rb") as f:
         data = tomllib.load(f)
-    mapping: Dict[str, List[str]] = {}
+    mapping: dict[str, list[str]] = {}
     for account in data.get("accounts", []):
         name = account["name"]
         mapping[name] = list(account.get("accounts", []))

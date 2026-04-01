@@ -6,7 +6,10 @@ from clippertv.data.domain import AggregateBucket
 
 def _buckets(*pairs):
     """Shorthand: pairs of (category, count)."""
-    return [AggregateBucket(period="2026-02", category=c, count=n, total_fare=0.0) for c, n in pairs]
+    return [
+        AggregateBucket(period="2026-02", category=c, count=n, total_fare=0.0)
+        for c, n in pairs
+    ]
 
 
 def test_keeps_explicit_list():
@@ -58,7 +61,9 @@ def test_multiple_periods():
 
 def test_other_sums_fares_too():
     buckets = [
-        AggregateBucket(period="2026-02", category="Caltrain", count=2, total_fare=15.40),
+        AggregateBucket(
+            period="2026-02", category="Caltrain", count=2, total_fare=15.40
+        ),
         AggregateBucket(period="2026-02", category="Ferry", count=1, total_fare=7.00),
     ]
     result = collapse_categories(buckets, keep=[])

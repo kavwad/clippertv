@@ -16,12 +16,14 @@ def apply_pass_costs(
     result = []
     for b in buckets:
         if b.category == "Caltrain" and b.period in pass_months:
-            result.append(AggregateBucket(
-                period=b.period,
-                category=b.category,
-                count=b.count,
-                total_fare=CALTRAIN_MONTHLY_PASS_COST,
-            ))
+            result.append(
+                AggregateBucket(
+                    period=b.period,
+                    category=b.category,
+                    count=b.count,
+                    total_fare=CALTRAIN_MONTHLY_PASS_COST,
+                )
+            )
         else:
             result.append(b)
     return result

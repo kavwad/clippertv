@@ -21,7 +21,9 @@ def compute_summary(
     trip_diff = trips_prev - trips_now
     cost_diff = cost_prev - cost_now
 
-    most_used = max(current_month, key=lambda b: b.count).category if current_month else "N/A"
+    most_used = (
+        max(current_month, key=lambda b: b.count).category if current_month else "N/A"
+    )
 
     return RiderSummary(
         trips_this_month=trips_now,

@@ -1,8 +1,9 @@
 """Turso database client initialization and management."""
 
+import contextlib
 import os
 from threading import Lock
-from typing import Any, Optional
+from typing import Any
 
 try:
     import libsql
@@ -11,7 +12,7 @@ except ImportError:
 
 
 _conn_lock = Lock()
-_cached_conn: Optional[Any] = None
+_cached_conn: Any | None = None
 _db_initialized = False
 
 
@@ -67,10 +68,8 @@ def reset_turso_client() -> None:
     global _cached_conn
     with _conn_lock:
         if _cached_conn is not None:
-            try:
+            with contextlib.suppress(Exception):
                 _cached_conn.close()
-            except Exception:
-                pass
             _cached_conn = None
 
 
@@ -87,6 +86,7 @@ def initialize_database(force: bool = False) -> None:
         if _db_initialized and not force:
             return
         from clippertv.data.schema import create_tables, seed_category_rules
+
         create_tables(conn)
         seed_category_rules(conn)
         _db_initialized = True

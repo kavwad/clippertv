@@ -1,7 +1,6 @@
 """Tests for the SQL query layer."""
 
 import sqlite3
-from datetime import datetime
 
 import pytest
 
@@ -24,17 +23,77 @@ def _insert_test_data(conn):
     """Insert test trips spanning two months and two accounts."""
     trips = [
         # Account A: BART trips in Feb + Mar 2026
-        ("A", "T1", "2026-02-01T08:00:00", "2026-02-01T08:30:00", "Rockridge", "Embarcadero", 4.55, "BART", None),
-        ("A", "T2", "2026-02-15T18:00:00", "2026-02-15T18:25:00", "Embarcadero", "Rockridge", 4.55, "BART", None),
-        ("A", "T3", "2026-03-01T08:00:00", "2026-03-01T08:30:00", "Rockridge", "Embarcadero", 4.55, "BART", None),
+        (
+            "A",
+            "T1",
+            "2026-02-01T08:00:00",
+            "2026-02-01T08:30:00",
+            "Rockridge",
+            "Embarcadero",
+            4.55,
+            "BART",
+            None,
+        ),
+        (
+            "A",
+            "T2",
+            "2026-02-15T18:00:00",
+            "2026-02-15T18:25:00",
+            "Embarcadero",
+            "Rockridge",
+            4.55,
+            "BART",
+            None,
+        ),
+        (
+            "A",
+            "T3",
+            "2026-03-01T08:00:00",
+            "2026-03-01T08:30:00",
+            "Rockridge",
+            "Embarcadero",
+            4.55,
+            "BART",
+            None,
+        ),
         # Account A: Muni Metro trip (location = metro station)
         ("A", "T4", "2026-02-10T09:00:00", None, "Powell", None, 2.50, "Muni", None),
         # Account A: Muni Bus trip (location = bus stop)
-        ("A", "T5", "2026-02-12T17:00:00", None, "Haight/Noriega", None, 2.50, "Muni", None),
+        (
+            "A",
+            "T5",
+            "2026-02-12T17:00:00",
+            None,
+            "Haight/Noriega",
+            None,
+            2.50,
+            "Muni",
+            None,
+        ),
         # Account B: Caltrain with pass
-        ("B", "T6", "2026-02-05T07:30:00", "2026-02-05T08:15:00", "San Francisco", "Palo Alto", 0.0, "Caltrain", "Caltrain Adult 3 Zone Monthly"),
+        (
+            "B",
+            "T6",
+            "2026-02-05T07:30:00",
+            "2026-02-05T08:15:00",
+            "San Francisco",
+            "Palo Alto",
+            0.0,
+            "Caltrain",
+            "Caltrain Adult 3 Zone Monthly",
+        ),
         # Account B: Caltrain cash ride in March
-        ("B", "T7", "2026-03-10T07:30:00", "2026-03-10T08:15:00", "San Francisco", "Palo Alto", 7.70, "Caltrain", None),
+        (
+            "B",
+            "T7",
+            "2026-03-10T07:30:00",
+            "2026-03-10T08:15:00",
+            "San Francisco",
+            "Palo Alto",
+            7.70,
+            "Caltrain",
+            None,
+        ),
     ]
     for t in trips:
         conn.execute(
@@ -63,7 +122,9 @@ def test_monthly_by_category_groups_correctly(ql):
 
 def test_monthly_by_category_resolves_muni_metro(ql):
     result = ql.monthly_by_category(["A"])
-    feb_metro = [b for b in result if b.period == "2026-02" and b.category == "Muni Metro"]
+    feb_metro = [
+        b for b in result if b.period == "2026-02" and b.category == "Muni Metro"
+    ]
     assert len(feb_metro) == 1
     assert feb_metro[0].count == 1
 

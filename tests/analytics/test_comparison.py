@@ -1,7 +1,6 @@
 """Tests for cross-rider comparison alignment."""
 
 from clippertv.analytics.comparison import align_riders
-from clippertv.data.domain import ComparisonPoint
 
 
 def test_fills_gaps_with_zeros():

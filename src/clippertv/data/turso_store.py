@@ -1,7 +1,5 @@
 """Turso-based data access layer for ClipperTV."""
 
-from typing import Optional
-
 import pandas as pd
 
 from clippertv.data.turso_client import (
@@ -52,13 +50,13 @@ class TursoStore:
             raise
 
     def save_csv_transactions(
-        self, account_number: str, df: pd.DataFrame,
-        user_id: Optional[str] = None,
+        self,
+        account_number: str,
+        df: pd.DataFrame,
+        user_id: str | None = None,
     ) -> int:
         """Save CSV-sourced transactions using trip_id for deduplication."""
-        result = self._execute(
-            "SELECT trip_id FROM trips WHERE trip_id IS NOT NULL"
-        )
+        result = self._execute("SELECT trip_id FROM trips WHERE trip_id IS NOT NULL")
         existing_trip_ids = {row[0] for row in result.fetchall()}
 
         new_rows = df[~df["trip_id"].isin(existing_trip_ids)]

@@ -1,41 +1,45 @@
 """Tests for the ingestion pipeline orchestrator."""
 
-import pandas as pd
 from unittest.mock import MagicMock
+
+import pandas as pd
 
 from clippertv.ingest.pipeline import ingest
 
 
 def _sample_csv_df() -> pd.DataFrame:
     """Create a sample CSV-parsed DataFrame."""
-    return pd.DataFrame([
-        {
-            "account_number": "100005510894",
-            "transaction_date": pd.Timestamp("2026-02-28 23:45:19"),
-            "end_datetime": None,
-            "start_location": "Haight/Noriega",
-            "end_location": None,
-            "fare": 2.85,
-            "operator": "Muni",
-            "pass_type": "Cash Value",
-            "trip_id": "11052564",
-        },
-        {
-            "account_number": "100005510894",
-            "transaction_date": pd.Timestamp("2026-02-28 21:16:16"),
-            "end_datetime": pd.Timestamp("2026-02-28 22:00:43"),
-            "start_location": "Fruitvale",
-            "end_location": "16th Street / Mission",
-            "fare": 5.35,
-            "operator": "BART",
-            "pass_type": "Cash Value",
-            "trip_id": "11047705",
-        },
-    ])
+    return pd.DataFrame(
+        [
+            {
+                "account_number": "100005510894",
+                "transaction_date": pd.Timestamp("2026-02-28 23:45:19"),
+                "end_datetime": None,
+                "start_location": "Haight/Noriega",
+                "end_location": None,
+                "fare": 2.85,
+                "operator": "Muni",
+                "pass_type": "Cash Value",
+                "trip_id": "11052564",
+            },
+            {
+                "account_number": "100005510894",
+                "transaction_date": pd.Timestamp("2026-02-28 21:16:16"),
+                "end_datetime": pd.Timestamp("2026-02-28 22:00:43"),
+                "start_location": "Fruitvale",
+                "end_location": "16th Street / Mission",
+                "fare": 5.35,
+                "operator": "BART",
+                "pass_type": "Cash Value",
+                "trip_id": "11047705",
+            },
+        ]
+    )
 
 
 def test_ingest_passes_df_without_category():
-    """Pipeline passes DataFrame through without adding category (derived at query time)."""
+    """Pipeline passes DataFrame through without adding category
+    (derived at query time)."""
     store = MagicMock()
     store.save_csv_transactions.return_value = 2
 

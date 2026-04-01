@@ -1,8 +1,6 @@
 """Tests for the scheduler service."""
 
-from unittest.mock import MagicMock, patch
-
-import pandas as pd
+from unittest.mock import patch
 
 from clippertv.scheduler.service import IngestionResult, main, run_ingestion
 
@@ -29,9 +27,7 @@ _SAMPLE_CSV = (
 @patch("clippertv.scheduler.service.download_transactions")
 @patch("clippertv.scheduler.service.login")
 @patch("clippertv.scheduler.service._load_config", return_value=_SAMPLE_CONFIG)
-def test_run_ingestion_success(
-    mock_config, mock_login, mock_download, mock_store
-):
+def test_run_ingestion_success(mock_config, mock_login, mock_download, mock_store):
     """Successful ingestion returns row count."""
     mock_download.return_value = [{"path": "test.csv", "content": _SAMPLE_CSV}]
     mock_store.return_value.save_csv_transactions.return_value = 1

@@ -24,11 +24,13 @@ def align_riders(
     for rider_name, counts in rider_counts.items():
         count_map = dict(counts)
         for period in filled_periods:
-            result.append(ComparisonPoint(
-                period=period,
-                rider_name=rider_name,
-                count=count_map.get(period, 0),
-            ))
+            result.append(
+                ComparisonPoint(
+                    period=period,
+                    rider_name=rider_name,
+                    count=count_map.get(period, 0),
+                )
+            )
     return result
 
 
