@@ -71,7 +71,12 @@ uv run python migrations/schema_v2.py --swap   # destructive swap
 ### Configuration (`src/clippertv/config.py`)
 - `AppConfig` - App settings (transit categories, colors)
 - `EnvConfig` - Environment variables (DB, JWT, encryption keys)
-- `load_account_mapping()` - Display name → account numbers from clipper.toml
+- `load_account_mapping()` - Display name → account numbers from clipper.toml (being replaced by DB lookups)
+
+### Identifier Conventions
+- **account_number** (long, e.g. `100005510894`): canonical Clipper account ID, stored in `trips.account_number` and `clipper_cards.account_number`. This is the join key.
+- **card_serial** (short, e.g. `1202425091`): physical card serial number, stored in `clipper_cards.card_serial`. Optional, not used for data linking.
+- **rider_name** (display, e.g. `kaveh`): friendly label for a card, stored in `clipper_cards.rider_name`.
 
 ### Key Environment Variables
 Required in `.env`:

@@ -393,23 +393,6 @@ def _load_config(path: str) -> dict:
         return tomllib.load(f)
 
 
-def _build_card_to_rider(accounts: list[dict]) -> dict[str, str]:
-    """Build a mapping of card/alias → rider name.
-
-    Account numbers are NOT mapped — they pass through as rider_ids
-    so the DB stores raw Clipper identifiers. Display name resolution
-    happens at read time via clipper.toml.
-    """
-    mapping = {}
-    for account in accounts:
-        rider = account["name"]
-        for card in account.get("cards", []):
-            mapping[card] = rider
-        for alias in account.get("aliases", []):
-            mapping[alias] = rider
-    return mapping
-
-
 def main() -> int:
     """CLI entry point for Clipper CSV downloader."""
     args = _parse_args()
@@ -423,7 +406,6 @@ def main() -> int:
         except Exception as e:
             sys.stderr.write(f"Error loading config file {args.config_file}: {e}\n")
             return 2
-        card_to_rider = _build_card_to_rider(config_data.get("accounts", []))
         store = TursoStore()
 
         for filepath in args.ingest_file:
@@ -434,12 +416,14 @@ def main() -> int:
             if df.empty:
                 print(f"  No transactions in {filepath}")
                 continue
-            for account_number, card_df in df.groupby("account_number"):
-                rider_id = card_to_rider.get(str(account_number), str(account_number))
+            for acct_num, card_df in df.groupby("account_number"):
                 count = run_ingest(
-                    card_df, rider_id=rider_id, user_id=None, store=store
+                    card_df,
+                    account_number=str(acct_num),
+                    user_id=None,
+                    store=store,
                 )
-                print(f"  {count} new transactions for {rider_id}")
+                print(f"  {count} new transactions for {acct_num}")
         return 0
 
     if (
@@ -508,8 +492,6 @@ def main() -> int:
     else:
         print("Downloading CSV transaction reports...")
 
-    card_to_rider = _build_card_to_rider(accounts)
-
     all_downloaded = []
     for account in accounts:
         name, email, pw = account["name"], account["email"], account["password"]
@@ -538,12 +520,14 @@ def main() -> int:
             if df.empty:
                 print(f"  No transactions in {download['path']}")
                 continue
-            for account_number, card_df in df.groupby("account_number"):
-                rider_id = card_to_rider.get(str(account_number), str(account_number))
+            for acct_num, card_df in df.groupby("account_number"):
                 count = run_ingest(
-                    card_df, rider_id=rider_id, user_id=None, store=store
+                    card_df,
+                    account_number=str(acct_num),
+                    user_id=None,
+                    store=store,
                 )
-                print(f"  {count} new transactions for {rider_id}")
+                print(f"  {count} new transactions for {acct_num}")
 
     if args.dry_run:
         print("\n[DRY RUN] Test completed successfully.")

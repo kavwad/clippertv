@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 def ingest(
     df: pd.DataFrame,
-    rider_id: str,
+    account_number: str,
     user_id: str | None,
     store: TursoStore,
 ) -> int:
@@ -24,8 +24,8 @@ def ingest(
 
     Args:
         df: Normalized DataFrame with columns from CSV parsing.
-        rider_id: Account number (from card-to-user lookup).
-        user_id: User ID (from card-to-user lookup).
+        account_number: Clipper account number (long form, e.g. "100005510894").
+        user_id: Optional user ID for multi-tenant association.
         store: TursoStore instance.
 
     Returns:
@@ -34,4 +34,4 @@ def ingest(
     if df.empty:
         return 0
 
-    return store.save_csv_transactions(rider_id, df, user_id=user_id)
+    return store.save_csv_transactions(account_number, df, user_id=user_id)

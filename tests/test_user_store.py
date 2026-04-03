@@ -170,13 +170,13 @@ class TestClipperCardStore:
 
         # Add clipper card
         card_data = ClipperCardCreate(
-            card_number="123456789", rider_name="Test Card", is_primary=True
+            account_number="123456789", rider_name="Test Card", is_primary=True
         )
         card = user_store.add_clipper_card(user.id, card_data)
 
         assert card.id
         assert card.user_id == user.id
-        assert card.card_number == "123456789"
+        assert card.account_number == "123456789"
         assert card.rider_name == "Test Card"
         assert card.is_primary is True
 
@@ -188,7 +188,7 @@ class TestClipperCardStore:
 
         # Add card with credentials
         card_data = ClipperCardCreate(
-            card_number="987654321",
+            account_number="987654321",
             rider_name="Card with Creds",
             credentials={"username": "clipper_user", "password": "clipper_pass"},
         )
@@ -209,7 +209,9 @@ class TestClipperCardStore:
         user = user_store.create_user(user_data)
 
         # Add first card
-        card_data = ClipperCardCreate(card_number="111222333", rider_name="First Card")
+        card_data = ClipperCardCreate(
+            account_number="111222333", rider_name="First Card"
+        )
         user_store.add_clipper_card(user.id, card_data)
 
         # Attempt to add duplicate
@@ -227,10 +229,10 @@ class TestClipperCardStore:
 
         # Add multiple cards
         card1 = ClipperCardCreate(
-            card_number="111111111", rider_name="Card 1", is_primary=False
+            account_number="111111111", rider_name="Card 1", is_primary=False
         )
         card2 = ClipperCardCreate(
-            card_number="222222222", rider_name="Card 2", is_primary=True
+            account_number="222222222", rider_name="Card 2", is_primary=True
         )
 
         user_store.add_clipper_card(user.id, card1)
@@ -255,10 +257,10 @@ class TestClipperCardStore:
 
         # Add two cards
         card1_data = ClipperCardCreate(
-            card_number="333333333", rider_name="Card 1", is_primary=True
+            account_number="333333333", rider_name="Card 1", is_primary=True
         )
         card2_data = ClipperCardCreate(
-            card_number="444444444", rider_name="Card 2", is_primary=False
+            account_number="444444444", rider_name="Card 2", is_primary=False
         )
 
         card1 = user_store.add_clipper_card(user.id, card1_data)
@@ -285,7 +287,7 @@ class TestClipperCardStore:
 
         # Add card
         card_data = ClipperCardCreate(
-            card_number="555555555", rider_name="Card to Delete"
+            account_number="555555555", rider_name="Card to Delete"
         )
         card = user_store.add_clipper_card(user.id, card_data)
 

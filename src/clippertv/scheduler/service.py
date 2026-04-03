@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from clippertv.ingest.clipper import (
-    _build_card_to_rider,
     _load_config,
     download_transactions,
     login,
@@ -59,8 +58,6 @@ def run_ingestion(
         log.warning("No accounts in %s", config_path)
         return []
 
-    card_to_rider = _build_card_to_rider(accounts)
-
     today = date.today()
     start_date = (today - timedelta(days=days)).isoformat()
     end_date = today.isoformat()
@@ -92,10 +89,14 @@ def run_ingestion(
             df = parse_csv(download["content"])
             if df.empty:
                 continue
-            for account_number, card_df in df.groupby("account_number"):
-                rider_id = card_to_rider.get(str(account_number), str(account_number))
+            for acct_num, card_df in df.groupby("account_number"):
                 assert store is not None
-                total += ingest(card_df, rider_id=rider_id, user_id=None, store=store)
+                total += ingest(
+                    card_df,
+                    account_number=str(acct_num),
+                    user_id=None,
+                    store=store,
+                )
 
         log.info("%s: %d new transactions", name, total)
         results.append(IngestionResult(account=name, new_rows=total))

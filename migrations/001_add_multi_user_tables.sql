@@ -19,7 +19,8 @@ CREATE INDEX IF NOT EXISTS users_email_idx ON users(email);
 CREATE TABLE IF NOT EXISTS clipper_cards (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
-    card_number TEXT NOT NULL,
+    account_number TEXT NOT NULL,
+    card_serial TEXT,
     rider_name TEXT NOT NULL,
     credentials_encrypted TEXT,
     is_primary INTEGER DEFAULT 0,
@@ -27,9 +28,9 @@ CREATE TABLE IF NOT EXISTS clipper_cards (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Create unique constraint on user_id + card_number
-CREATE UNIQUE INDEX IF NOT EXISTS clipper_cards_user_card_idx
-    ON clipper_cards(user_id, card_number);
+-- Create unique constraint on user_id + account_number
+CREATE UNIQUE INDEX IF NOT EXISTS clipper_cards_user_account_idx
+    ON clipper_cards(user_id, account_number);
 
 -- Create index on user_id for fast lookups
 CREATE INDEX IF NOT EXISTS clipper_cards_user_id_idx ON clipper_cards(user_id);

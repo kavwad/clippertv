@@ -43,7 +43,7 @@ def test_ingest_passes_df_without_category():
     store = MagicMock()
     store.save_csv_transactions.return_value = 2
 
-    ingest(_sample_csv_df(), rider_id="K", user_id="u1", store=store)
+    ingest(_sample_csv_df(), account_number="K", user_id="u1", store=store)
 
     call_args = store.save_csv_transactions.call_args
     df_saved = call_args[0][1]  # second positional arg
@@ -56,17 +56,17 @@ def test_ingest_returns_count():
     store = MagicMock()
     store.save_csv_transactions.return_value = 2
 
-    count = ingest(_sample_csv_df(), rider_id="K", user_id="u1", store=store)
+    count = ingest(_sample_csv_df(), account_number="K", user_id="u1", store=store)
     assert count == 2
 
 
 def test_ingest_passes_rider_and_user():
-    """Pipeline passes rider_id and user_id through to store."""
+    """Pipeline passes account_number and user_id through to store."""
     store = MagicMock()
     store.save_csv_transactions.return_value = 0
 
-    ingest(_sample_csv_df(), rider_id="K", user_id="u1", store=store)
+    ingest(_sample_csv_df(), account_number="K", user_id="u1", store=store)
 
     call_args = store.save_csv_transactions.call_args
-    assert call_args[0][0] == "K"  # rider_id
+    assert call_args[0][0] == "K"  # account_number
     assert call_args[1]["user_id"] == "u1"

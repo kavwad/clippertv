@@ -163,13 +163,13 @@ class UserStore:
         """
         # Check if card already exists for this user
         existing = self.client.execute(
-            "SELECT id FROM clipper_cards WHERE user_id = ? AND card_number = ?",
-            [user_id, card_data.card_number],
+            "SELECT id FROM clipper_cards WHERE user_id = ? AND account_number = ?",
+            [user_id, card_data.account_number],
         ).fetchone()
 
         if existing:
             raise ValueError(
-                f"Card {card_data.card_number} already exists for this user"
+                f"Card {card_data.account_number} already exists for this user"
             )
 
         card_id = str(uuid.uuid4())
@@ -191,14 +191,15 @@ class UserStore:
         self.client.execute(
             """
             INSERT INTO clipper_cards
-                (id, user_id, card_number, rider_name,
+                (id, user_id, account_number, card_serial, rider_name,
                  credentials_encrypted, is_primary, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
                 card_id,
                 user_id,
-                card_data.card_number,
+                card_data.account_number,
+                card_data.card_serial,
                 card_data.rider_name,
                 credentials_encrypted,
                 card_data.is_primary,
@@ -221,7 +222,7 @@ class UserStore:
         """
         result = self.client.execute(
             """
-            SELECT id, user_id, card_number, rider_name,
+            SELECT id, user_id, account_number, card_serial, rider_name,
                    credentials_encrypted, is_primary, created_at
             FROM clipper_cards WHERE id = ?
             """,
@@ -235,11 +236,12 @@ class UserStore:
         return ClipperCard(
             id=row[0],
             user_id=row[1],
-            card_number=row[2],
-            rider_name=row[3],
-            credentials_encrypted=row[4],
-            is_primary=bool(row[5]),
-            created_at=datetime.fromisoformat(row[6]) if row[6] else datetime.now(),
+            account_number=row[2],
+            card_serial=row[3],
+            rider_name=row[4],
+            credentials_encrypted=row[5],
+            is_primary=bool(row[6]),
+            created_at=datetime.fromisoformat(row[7]) if row[7] else datetime.now(),
         )
 
     def get_user_clipper_cards(self, user_id: str) -> list[ClipperCard]:
@@ -254,7 +256,7 @@ class UserStore:
         """
         result = self.client.execute(
             """
-            SELECT id, user_id, card_number, rider_name,
+            SELECT id, user_id, account_number, card_serial, rider_name,
                    credentials_encrypted, is_primary, created_at
             FROM clipper_cards
             WHERE user_id = ? ORDER BY is_primary DESC, created_at ASC
@@ -268,12 +270,13 @@ class UserStore:
                 ClipperCard(
                     id=row[0],
                     user_id=row[1],
-                    card_number=row[2],
-                    rider_name=row[3],
-                    credentials_encrypted=row[4],
-                    is_primary=bool(row[5]),
-                    created_at=datetime.fromisoformat(row[6])
-                    if row[6]
+                    account_number=row[2],
+                    card_serial=row[3],
+                    rider_name=row[4],
+                    credentials_encrypted=row[5],
+                    is_primary=bool(row[6]),
+                    created_at=datetime.fromisoformat(row[7])
+                    if row[7]
                     else datetime.now(),
                 )
             )

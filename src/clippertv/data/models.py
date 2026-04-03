@@ -44,7 +44,12 @@ class ClipperCard(BaseModel):
 
     id: str = Field(..., description="Unique card identifier")
     user_id: str = Field(..., description="ID of the user who owns this card")
-    card_number: str = Field(..., description="Clipper card number (last 9 digits)")
+    account_number: str = Field(
+        ..., description="Clipper account number (long form, e.g. '100005510894')"
+    )
+    card_serial: str | None = Field(
+        None, description="Physical card serial number (short form, e.g. '1202425091')"
+    )
     rider_name: str = Field(
         ..., description="Friendly name for this card (e.g., 'Work Card')"
     )
@@ -65,7 +70,12 @@ class ClipperCard(BaseModel):
 class ClipperCardCreate(BaseModel):
     """Clipper card registration payload."""
 
-    card_number: str = Field(..., description="Clipper card number (last 9 digits)")
+    account_number: str = Field(
+        ..., description="Clipper account number (long form, e.g. '100005510894')"
+    )
+    card_serial: str | None = Field(
+        None, description="Physical card serial number (optional)"
+    )
     rider_name: str = Field(..., description="Friendly name for this card")
     credentials: dict[str, str] | None = Field(
         None, description="Clipper account credentials (username, password)"
