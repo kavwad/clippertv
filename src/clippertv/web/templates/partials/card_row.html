@@ -1,0 +1,17 @@
+<div class="card-row" id="card-{{ card.id }}">
+    <div class="card-info">
+        <strong>{{ card.rider_name }}</strong>
+        <span class="card-account">{{ card.account_number }}</span>
+        {% if card.card_serial %}
+        <span class="card-serial">(serial: {{ card.card_serial }})</span>
+        {% endif %}
+        {% if card.credentials_encrypted %}
+        <span class="card-badge">auto-download</span>
+        {% endif %}
+    </div>
+    <button class="card-delete"
+            hx-delete="/settings/cards/{{ card.id }}"
+            hx-target="#card-{{ card.id }}"
+            hx-swap="outerHTML"
+            hx-confirm="Delete this card?">Delete</button>
+</div>

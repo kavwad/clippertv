@@ -29,7 +29,7 @@ def _mock_user_store():
     """Build a mock UserStore with one card."""
     store = MagicMock()
     store.get_all_cards_with_credentials.return_value = [_SAMPLE_CARD]
-    store.get_decrypted_credentials.return_value = {
+    store.decrypt_card_credentials.return_value = {
         "username": "alice@example.com",
         "password": "secret",
     }

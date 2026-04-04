@@ -51,6 +51,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.ruff.lint.per-file-ignores]
 "tests/ingest/test_clipper.py" = ["E501"]
 "src/clippertv/web/routes.py" = ["B008"]  # Depends() in defaults is standard FastAPI
+"src/clippertv/web/settings_routes.py" = ["B008"]
 
 [tool.pytest.ini_options]
 markers = [

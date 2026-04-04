@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Settings</h1>
+
+<section class="settings-section">
+    <h2>Clipper Cards</h2>
+
+    <div id="card-list">
+        {% for card in cards %}
+        {% include "partials/card_row.html" %}
+        {% endfor %}
+    </div>
+
+    <h3>Add a card</h3>
+    <form hx-post="/settings/cards"
+          hx-target="#card-list"
+          hx-swap="beforeend"
+          hx-on::after-request="if(event.detail.successful) this.reset()"
+          class="card-form">
+        <div class="form-row">
+            <input type="text" name="account_number" placeholder="Account number (long)" required class="form-input">
+            <input type="text" name="card_serial" placeholder="Card serial (optional)" class="form-input">
+        </div>
+        <div class="form-row">
+            <input type="text" name="rider_name" placeholder="Rider name" required class="form-input">
+        </div>
+        <details class="cred-details">
+            <summary>Clipper site credentials (for auto-download)</summary>
+            <div class="form-row">
+                <input type="email" name="clipper_email" placeholder="Clipper email" class="form-input">
+                <input type="password" name="clipper_password" placeholder="Clipper password" class="form-input">
+            </div>
+        </details>
+        <button type="submit" class="form-button">Add card</button>
+    </form>
+</section>
+
+<section class="settings-section">
+    <h2>Account</h2>
+    <p>{{ user.email }}</p>
+</section>
+{% endblock %}

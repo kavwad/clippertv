@@ -20,33 +20,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from clippertv.auth.crypto import CredentialEncryption  # noqa: E402
-from clippertv.auth.service import AuthService  # noqa: E402
-from clippertv.config import EnvConfig  # noqa: E402
 from clippertv.data.models import ClipperCardCreate, UserCreate  # noqa: E402
-from clippertv.data.turso_client import (  # noqa: E402
-    get_turso_client,
-    initialize_database,
-)
 from clippertv.data.user_store import UserStore  # noqa: E402
 
 
 def _load_toml(path: str = "clipper.toml") -> dict:
     with open(path, "rb") as f:
         return tomllib.load(f)
-
-
-def _build_store() -> UserStore:
-    initialize_database()
-    key = EnvConfig.JWT_SECRET_KEY
-    enc_key = EnvConfig.ENCRYPTION_KEY
-    if not key or not enc_key:
-        sys.exit("JWT_SECRET_KEY and ENCRYPTION_KEY must be set in .env")
-    return UserStore(
-        client=get_turso_client(),
-        auth_service=AuthService(secret_key=key),
-        crypto=CredentialEncryption(encryption_key=enc_key),
-    )
 
 
 def main():
@@ -78,7 +58,7 @@ def main():
         passwords[name.lower()] = pw
 
     config = _load_toml(args.config)
-    store = _build_store()
+    store = UserStore.from_env()
 
     if args.clean_test_data:
         _clean_test_data(store)
@@ -129,16 +109,7 @@ def main():
                 # Update credentials on existing card
                 card = next(c for c in existing_cards if c.account_number == acct_num)
                 if clipper_password and email:
-                    encrypted = store.crypto.encrypt_credentials(
-                        email,
-                        clipper_password,
-                    )
-                    store.client.execute(
-                        "UPDATE clipper_cards SET credentials_encrypted = ?"
-                        " WHERE id = ?",
-                        [encrypted, card.id],
-                    )
-                    store.client.commit()
+                    store.update_card_credentials(card.id, email, clipper_password)
                     print(f"    Card {acct_num} — updated credentials")
                 else:
                     print(f"    Card {acct_num} — already exists, skipped")

@@ -13,6 +13,7 @@ from starlette.middleware.authentication import AuthenticationMiddleware  # noqa
 from clippertv.web.auth import CookieAuthBackend, auth_exception_handlers  # noqa: E402
 from clippertv.web.auth_routes import router as auth_router  # noqa: E402
 from clippertv.web.routes import router  # noqa: E402
+from clippertv.web.settings_routes import router as settings_router  # noqa: E402
 
 app = FastAPI(title="ClipperTV", description="Transit trip dashboard")
 
@@ -28,8 +29,9 @@ app.mount(
     "/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static"
 )
 
-# Routes — auth routes first (login/logout), then dashboard
+# Routes — auth first, then settings, then dashboard
 app.include_router(auth_router)
+app.include_router(settings_router)
 app.include_router(router)
 
 

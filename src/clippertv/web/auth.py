@@ -12,10 +12,6 @@ from starlette.authentication import (
     BaseUser,
 )
 
-from clippertv.auth.crypto import CredentialEncryption
-from clippertv.auth.service import AuthService
-from clippertv.config import EnvConfig
-from clippertv.data.turso_client import get_turso_client, initialize_database
 from clippertv.data.user_store import UserStore
 
 if TYPE_CHECKING:
@@ -26,46 +22,19 @@ if TYPE_CHECKING:
 COOKIE_NAME = "clippertv_token"
 COOKIE_MAX_AGE = 7 * 24 * 60 * 60  # 7 days
 
-# ---------------------------------------------------------------------------
-# Lazy singletons
-# ---------------------------------------------------------------------------
-
-_auth_service: AuthService | None = None
 _user_store: UserStore | None = None
-
-
-def get_auth_service() -> AuthService:
-    global _auth_service
-    if _auth_service is None:
-        key = EnvConfig.JWT_SECRET_KEY
-        if not key:
-            raise ValueError("JWT_SECRET_KEY not set")
-        _auth_service = AuthService(
-            secret_key=key,
-            algorithm=EnvConfig.JWT_ALGORITHM,
-            token_expiry_days=EnvConfig.JWT_EXPIRY_DAYS,
-        )
-    return _auth_service
 
 
 def get_user_store() -> UserStore:
     global _user_store
     if _user_store is None:
-        initialize_database()
-        enc_key = EnvConfig.ENCRYPTION_KEY
-        if not enc_key:
-            raise ValueError("ENCRYPTION_KEY not set")
-        _user_store = UserStore(
-            client=get_turso_client(),
-            auth_service=get_auth_service(),
-            crypto=CredentialEncryption(encryption_key=enc_key),
-        )
+        _user_store = UserStore.from_env()
     return _user_store
 
 
-# ---------------------------------------------------------------------------
-# Starlette AuthenticationBackend
-# ---------------------------------------------------------------------------
+def get_auth_service():
+    """Convenience accessor for the AuthService from the cached UserStore."""
+    return get_user_store().auth
 
 
 class AuthenticatedUser(BaseUser):
@@ -110,21 +79,11 @@ class CookieAuthBackend(AuthenticationBackend):
         return AuthCredentials(["authenticated"]), AuthenticatedUser(user)
 
 
-# ---------------------------------------------------------------------------
-# FastAPI dependency
-# ---------------------------------------------------------------------------
-
-
 def require_auth(request: Request) -> User:
-    """FastAPI dependency that ensures the request is authenticated.
-
-    Returns the clippertv User model. Redirects to /login on failure,
-    or sends HX-Redirect for HTMX requests.
-    """
+    """FastAPI dependency — returns User or redirects to /login."""
     if request.user.is_authenticated:
         return request.user.user  # type: ignore[union-attr]
 
-    # HTMX requests: return 401 with HX-Redirect header
     if request.headers.get("HX-Request"):
         raise _htmx_login_redirect()
 
@@ -132,11 +91,11 @@ def require_auth(request: Request) -> User:
 
 
 class _htmx_login_redirect(Exception):
-    """Signal for HTMX auth failure — handled by exception handler."""
+    """Signal for HTMX auth failure."""
 
 
 class _html_login_redirect(Exception):
-    """Signal for regular auth failure — handled by exception handler."""
+    """Signal for regular auth failure."""
 
 
 def auth_exception_handlers() -> dict:

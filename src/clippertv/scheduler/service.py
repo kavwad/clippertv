@@ -32,22 +32,9 @@ class IngestionResult:
 
 def _build_user_store():
     """Build a UserStore from environment config."""
-    from clippertv.auth.crypto import CredentialEncryption
-    from clippertv.auth.service import AuthService
-    from clippertv.config import EnvConfig
-    from clippertv.data.turso_client import get_turso_client, initialize_database
     from clippertv.data.user_store import UserStore
 
-    initialize_database()
-    key = EnvConfig.JWT_SECRET_KEY
-    enc_key = EnvConfig.ENCRYPTION_KEY
-    if not key or not enc_key:
-        raise ValueError("JWT_SECRET_KEY and ENCRYPTION_KEY must be set")
-    return UserStore(
-        client=get_turso_client(),
-        auth_service=AuthService(secret_key=key),
-        crypto=CredentialEncryption(encryption_key=enc_key),
-    )
+    return UserStore.from_env()
 
 
 def run_ingestion(
@@ -85,7 +72,7 @@ def run_ingestion(
     card_account_numbers: dict[str, list[str]] = defaultdict(list)
 
     for card in cards:
-        creds = store.get_decrypted_credentials(card.id)
+        creds = store.decrypt_card_credentials(card)
         if not creds:
             log.warning("Failed to decrypt credentials for card %s", card.id)
             continue
