@@ -149,39 +149,3 @@ def load_display_categories(config_path: str = "clipper.toml") -> list[str] | No
     display = data.get("display", {})
     cats = display.get("categories")
     return list(cats) if cats else None
-
-
-def load_rider_mapping(config_path: str = "clipper.toml") -> dict[str, str]:
-    """Build rider_id → display name mapping from clipper.toml.
-
-    Maps card numbers, account numbers, and aliases to the rider name.
-    """
-    path = Path(config_path)
-    if not path.exists():
-        return {}
-    with open(path, "rb") as f:
-        data = tomllib.load(f)
-    mapping: dict[str, str] = {}
-    for account in data.get("accounts", []):
-        name = account["name"]
-        for key in ("cards", "accounts", "aliases"):
-            for val in account.get(key, []):
-                mapping[val] = name
-    return mapping
-
-
-def load_account_mapping(config_path: str = "clipper.toml") -> dict[str, list[str]]:
-    """Build display name → account numbers mapping from clipper.toml.
-
-    Returns a dict like {"kaveh": ["100005510894", "100005510902"], ...}.
-    """
-    path = Path(config_path)
-    if not path.exists():
-        return {}
-    with open(path, "rb") as f:
-        data = tomllib.load(f)
-    mapping: dict[str, list[str]] = {}
-    for account in data.get("accounts", []):
-        name = account["name"]
-        mapping[name] = list(account.get("accounts", []))
-    return mapping

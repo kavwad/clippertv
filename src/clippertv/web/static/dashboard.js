@@ -65,7 +65,7 @@ function revealChart(canvasId, skeletonId) {
     if (canvas) canvas.style.display = '';
 }
 
-function loadCharts(rider) {
+function loadCharts() {
     destroyChart('trip');
     destroyChart('cost');
 
@@ -74,7 +74,7 @@ function loadCharts(rider) {
     // Trip chart
     const tripCanvas = document.getElementById('tripChart');
     if (tripCanvas) {
-        fetch(`/api/trips/${rider}`)
+        fetch('/api/trips')
             .then(r => r.json())
             .then(data => {
                 revealChart('tripChart', 'tripSkeleton');
@@ -100,7 +100,7 @@ function loadCharts(rider) {
     // Cost chart
     const costCanvas = document.getElementById('costChart');
     if (costCanvas) {
-        fetch(`/api/costs/${rider}`)
+        fetch('/api/costs')
             .then(r => r.json())
             .then(data => {
                 revealChart('costChart', 'costSkeleton');
@@ -192,14 +192,11 @@ function loadComparisonChart() {
         });
 }
 
-// Re-init charts and tabs after HTMX swaps dashboard content
+// Re-init charts after HTMX swaps dashboard content
 document.body.addEventListener('htmx:afterSwap', function(event) {
     if (event.detail.target.id === 'dashboard-content') {
         destroyChart('comparison');
-        const rider = new URLSearchParams(window.location.search).get('rider');
-        if (rider) {
-            loadCharts(rider);
-        }
+        loadCharts();
     }
 });
 
@@ -211,14 +208,5 @@ document.body.addEventListener('click', function(event) {
     switchTab(tabGroup.id, btn.dataset.tab);
     if (btn.dataset.tab === 'comparison') {
         loadComparisonChart();
-    }
-});
-
-// Toggle active class on rider buttons immediately on click
-document.body.addEventListener('htmx:beforeRequest', function(event) {
-    const el = event.detail.elt;
-    if (el.classList.contains('rider-btn')) {
-        document.querySelectorAll('.rider-btn').forEach(btn => btn.classList.remove('active'));
-        el.classList.add('active');
     }
 });

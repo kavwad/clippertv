@@ -11,6 +11,17 @@
     <script src="https://unpkg.com/htmx-ext-preload@2.1.0"></script>
 </head>
 <body hx-ext="preload">
+    {% if request.user.is_authenticated %}
+    <nav class="site-nav">
+        <span class="nav-user">{{ request.user.display_name }}</span>
+        <div class="nav-links">
+            <a href="/settings">Settings</a>
+            <form method="post" action="/logout" style="display:inline">
+                <button type="submit" class="nav-logout">Log out</button>
+            </form>
+        </div>
+    </nav>
+    {% endif %}
     {% block content %}{% endblock %}
 
     <script>

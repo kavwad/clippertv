@@ -1,18 +1,6 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="rider-selector">
-    {% for r in riders %}
-    <a href="/?rider={{ r }}"
-       hx-get="/partials/dashboard?rider={{ r }}"
-       hx-target="#dashboard-content"
-       hx-swap="innerHTML transition:true"
-       hx-push-url="/?rider={{ r }}"
-       preload="mousedown"
-       class="rider-btn {% if r == rider %}active{% endif %}">{{ r }}</a>
-    {% endfor %}
-</div>
-
 <h1>Welcome to Clipper TV!</h1>
 
 <div id="dashboard-content">
@@ -23,6 +11,6 @@
 {% block scripts %}
 <script src="/static/dashboard.js"></script>
 {% if rider is not none %}
-<script>loadCharts('{{ rider }}');</script>
+<script>loadCharts();</script>
 {% endif %}
 {% endblock %}
