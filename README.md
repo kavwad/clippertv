@@ -5,8 +5,9 @@ Transit dashboard for Bay Area Clipper card riders. Download your transaction hi
 ## Features
 
 - **CSV ingestion** from clippercard.com API with automatic categorization
-- **Interactive dashboard** with
-- **Multi-rider support**
+- **Interactive dashboard** with Chart.js visualizations and HTMX interactions
+- **Multi-user auth** with per-user Clipper card management
+- **Scheduled ingestion** via launchd or CLI
 
 ## Quick Start
 
@@ -16,13 +17,15 @@ uv sync --extra web
 
 # Set up environment
 cp .env.example .env  # then fill in values
-uv run python scripts/test_env.py
+
+# Run dashboard
+uv run uvicorn clippertv.web.main:app --reload --host 0.0.0.0
 
 # Download and ingest transactions
 clipper-download --last-month --ingest
 
-# Run dashboard
-uv run uvicorn clippertv.web.main:app --reload --host 0.0.0.0
+# Scheduled ingestion (all accounts, last 30 days)
+uv run clippertv-ingest --days 30 -v
 ```
 
 ## Project Structure
@@ -30,13 +33,15 @@ uv run uvicorn clippertv.web.main:app --reload --host 0.0.0.0
 ```
 clippertv/
 ├── src/clippertv/
-│   ├── ingest/            # CSV download, parsing, categorization
-│   ├── data/              # Models, Turso storage, DB client
+│   ├── ingest/            # CSV download, parsing, storage
+│   ├── data/              # Models, Turso storage, DB client, user store
 │   ├── auth/              # JWT auth, credential encryption
-│   ├── viz/               # Data processing for dashboard
-│   ├── web/               # FastAPI routes + Chart.js templates
+│   ├── analytics/         # Pass costs, categories, comparison, summary
+│   ├── scheduler/         # Platform-agnostic ingestion runner
+│   ├── web/               # FastAPI app, auth middleware, routes, templates
 │   └── config.py          # App and environment config
-├── migrations/            # Database migrations
+├── migrations/            # SQL and Python database migrations
+├── scheduler/             # launchd plist + shell wrapper
 ├── tests/                 # Test suite
 └── .env                   # Environment configuration
 ```

@@ -17,9 +17,8 @@ uv run clippertv-ingest --days 30 -v
 uv run pytest                        # All tests
 uv run pytest -k test_name           # Specific test
 
-# DB migration (v2 schema)
-uv run python migrations/schema_v2.py          # dry run
-uv run python migrations/schema_v2.py --swap   # destructive swap
+# DB migrations
+uv run python migrations/run_migration.py      # run SQL/Python migrations
 ```
 
 ## Dependencies
@@ -40,7 +39,7 @@ uv run python migrations/schema_v2.py --swap   # destructive swap
 - `pipeline.py` - Thin orchestrator: parse CSV → store (no category derivation)
 
 ### Scheduler (`src/clippertv/scheduler/`)
-- `service.py` - Platform-agnostic ingestion runner (`run_ingestion()`, `clippertv-ingest` CLI)
+- `service.py` - Platform-agnostic ingestion runner (`run_ingestion()`, `clippertv-ingest` CLI); reads Clipper credentials from DB
 - `__main__.py` - `python -m clippertv.scheduler` support
 - `scheduler/` (repo root) - launchd plist + shell wrapper (platform glue)
 
@@ -64,14 +63,21 @@ uv run python migrations/schema_v2.py --swap   # destructive swap
 - `crypto.py` - CredentialEncryption (Fernet encryption for Clipper credentials)
 
 ### Web UI (`src/clippertv/web/`)
-- `main.py` - FastAPI app entry point
+- `main.py` - FastAPI app with Starlette `AuthenticationMiddleware`
+- `auth.py` - Cookie-based auth backend, `require_auth` dependency
+- `auth_routes.py` - Login/logout + Clipper credential validation on signup
+- `settings_routes.py` - Card management (add/remove Clipper cards)
 - `routes.py` - Dashboard and API endpoints (uses queries + analytics, no pandas)
-- `templates/` - Jinja2 templates with Chart.js
+- `static/` - `dashboard.js`, `style.css`
+- `templates/` - Jinja2 templates with Chart.js and HTMX
 
 ### Configuration (`src/clippertv/config.py`)
 - `AppConfig` - App settings (transit categories, colors)
 - `EnvConfig` - Environment variables (DB, JWT, encryption keys)
-- `load_account_mapping()` - Display name → account numbers from clipper.toml (being replaced by DB lookups)
+- `load_display_categories()` - Optional display category ordering
+
+### Identity Model
+Users sign up with a ClipperTV account (email + password). During signup or in settings, they link Clipper cards by providing clippercard.com credentials, which are validated against the Clipper API and stored encrypted. Each user can have multiple cards; the dashboard is scoped to the authenticated user's cards.
 
 ### Identifier Conventions
 - **account_number** (long, e.g. `100005510894`): canonical Clipper account ID, stored in `trips.account_number` and `clipper_cards.account_number`. This is the join key.
