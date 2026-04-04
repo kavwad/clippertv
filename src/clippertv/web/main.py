@@ -8,17 +8,28 @@ load_dotenv()
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
+from starlette.middleware.authentication import AuthenticationMiddleware  # noqa: E402
 
+from clippertv.web.auth import CookieAuthBackend, auth_exception_handlers  # noqa: E402
+from clippertv.web.auth_routes import router as auth_router  # noqa: E402
 from clippertv.web.routes import router  # noqa: E402
 
 app = FastAPI(title="ClipperTV", description="Transit trip dashboard")
+
+# Authentication middleware — populates request.user on every request
+app.add_middleware(AuthenticationMiddleware, backend=CookieAuthBackend())
+
+# Exception handlers for auth redirects
+for exc_class, handler in auth_exception_handlers().items():
+    app.add_exception_handler(exc_class, handler)
 
 # Static files
 app.mount(
     "/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static"
 )
 
-# Include routes
+# Routes — auth routes first (login/logout), then dashboard
+app.include_router(auth_router)
 app.include_router(router)
 
 

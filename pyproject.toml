@@ -15,6 +15,7 @@ dependencies = [
     "fastapi>=0.115.0",
     "jinja2>=3.1.0",
     "uvicorn>=0.34.0",
+    "python-multipart>=0.0.22",
 ]
 
 [project.scripts]
@@ -49,6 +50,7 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/ingest/test_clipper.py" = ["E501"]
+"src/clippertv/web/routes.py" = ["B008"]  # Depends() in defaults is standard FastAPI
 
 [tool.pytest.ini_options]
 markers = [

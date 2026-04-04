@@ -45,6 +45,40 @@ def create_tables(conn) -> None:
         )
     """)
 
+    # Auth tables
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id              TEXT PRIMARY KEY,
+            email           TEXT UNIQUE NOT NULL,
+            password_hash   TEXT NOT NULL,
+            name            TEXT,
+            created_at      TEXT DEFAULT (datetime('now')),
+            updated_at      TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS users_email_idx ON users(email)")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS clipper_cards (
+            id                      TEXT PRIMARY KEY,
+            user_id                 TEXT NOT NULL,
+            account_number          TEXT NOT NULL,
+            card_serial             TEXT,
+            rider_name              TEXT NOT NULL,
+            credentials_encrypted   TEXT,
+            is_primary              INTEGER DEFAULT 0,
+            created_at              TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    """)
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS clipper_cards_user_account_idx"
+        " ON clipper_cards(user_id, account_number)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS clipper_cards_user_id_idx ON clipper_cards(user_id)"
+    )
+
     conn.execute("""
         CREATE TABLE IF NOT EXISTS category_rules (
             id        INTEGER PRIMARY KEY AUTOINCREMENT,

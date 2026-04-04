@@ -7,7 +7,7 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -17,8 +17,10 @@ from clippertv.analytics.pass_costs import apply_pass_costs
 from clippertv.analytics.summary import compute_summary
 from clippertv.config import config, load_account_mapping, load_display_categories
 from clippertv.data.domain import AggregateBucket
+from clippertv.data.models import User
 from clippertv.data.queries import QueryLayer
 from clippertv.data.turso_client import get_turso_client, initialize_database
+from clippertv.web.auth import require_auth
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -142,7 +144,9 @@ def _dashboard_context(rider: str) -> dict:
 
 
 @router.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request, rider: str = ""):
+async def dashboard(
+    request: Request, rider: str = "", _user: User = Depends(require_auth)
+):
     """Render the main dashboard page."""
     riders = get_riders()
     if not riders:
@@ -165,7 +169,9 @@ async def dashboard(request: Request, rider: str = ""):
 
 
 @router.get("/partials/dashboard", response_class=HTMLResponse)
-async def dashboard_partial(request: Request, rider: str = ""):
+async def dashboard_partial(
+    request: Request, rider: str = "", _user: User = Depends(require_auth)
+):
     """Return dashboard content partial for HTMX swap."""
     riders = get_riders()
     if not riders:
@@ -186,7 +192,7 @@ async def dashboard_partial(request: Request, rider: str = ""):
 
 
 @router.get("/api/trips/{rider}")
-async def get_trip_data(rider: str):
+async def get_trip_data(rider: str, _user: User = Depends(require_auth)):
     """Return trip chart data as JSON for Chart.js."""
     ql = _get_ql()
     accounts = _accounts_for(rider)
@@ -199,7 +205,7 @@ async def get_trip_data(rider: str):
 
 
 @router.get("/api/costs/{rider}")
-async def get_cost_data(rider: str):
+async def get_cost_data(rider: str, _user: User = Depends(require_auth)):
     """Return cost chart data as JSON for Chart.js."""
     ql = _get_ql()
     accounts = _accounts_for(rider)
@@ -213,7 +219,7 @@ async def get_cost_data(rider: str):
 
 
 @router.get("/api/comparison")
-async def get_comparison_data():
+async def get_comparison_data(_user: User = Depends(require_auth)):
     """Return comparison chart data as JSON for Chart.js."""
     ql = _get_ql()
     riders = get_riders()
@@ -280,13 +286,15 @@ def _table_context(rider: str) -> dict:
 
 
 @router.get("/api/tables/{rider}")
-async def get_table_data(rider: str):
+async def get_table_data(rider: str, _user: User = Depends(require_auth)):
     """Return pivot table data for display."""
     return _table_context(rider)
 
 
 @router.get("/partials/tables/{rider}", response_class=HTMLResponse)
-async def get_table_html(request: Request, rider: str):
+async def get_table_html(
+    request: Request, rider: str, _user: User = Depends(require_auth)
+):
     """Return pre-rendered table HTML for HTMX swap."""
     return templates.TemplateResponse(
         request,

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="login-container">
+    <h1>ClipperTV</h1>
+
+    {% if error %}
+    <div class="login-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/login" class="login-form">
+        <input
+            type="email"
+            name="email"
+            placeholder="Email"
+            required
+            autocomplete="email"
+            class="form-input"
+        >
+        <input
+            type="password"
+            name="password"
+            placeholder="Password"
+            required
+            autocomplete="current-password"
+            class="form-input"
+        >
+        <button type="submit" class="form-button">Log in</button>
+    </form>
+</div>
+{% endblock %}
