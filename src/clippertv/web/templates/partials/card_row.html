@@ -1,13 +1,16 @@
 <div class="card-row" id="card-{{ card.id }}">
     <div class="card-info">
-        <strong>{{ card.rider_name }}</strong>
+        <form class="card-rename-form"
+              hx-post="/settings/cards/{{ card.id }}/rename"
+              hx-target="#card-{{ card.id }}"
+              hx-swap="outerHTML">
+            <input type="text"
+                   name="rider_name"
+                   value="{{ card.rider_name }}"
+                   class="card-name-input"
+                   title="Click to rename">
+        </form>
         <span class="card-account">{{ card.account_number }}</span>
-        {% if card.card_serial %}
-        <span class="card-serial">(serial: {{ card.card_serial }})</span>
-        {% endif %}
-        {% if card.credentials_encrypted %}
-        <span class="card-badge">auto-download</span>
-        {% endif %}
     </div>
     <button class="card-delete"
             hx-delete="/settings/cards/{{ card.id }}"

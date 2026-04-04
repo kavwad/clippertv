@@ -179,6 +179,81 @@ th {
     font-weight: 500;
 }
 
+/* Reauth banner */
+.reauth-banner {
+    background: rgba(253, 184, 19, 0.15);
+    color: #FDB813;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}
+
+.reauth-banner a {
+    color: #FDB813;
+    text-decoration: underline;
+}
+
+/* Card rename */
+.card-name-input {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text);
+    font-weight: bold;
+    font-size: inherit;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    width: auto;
+}
+
+.card-name-input:hover {
+    border-color: var(--border);
+}
+
+.card-name-input:focus {
+    border-color: var(--accent);
+    outline: none;
+}
+
+.card-rename-form {
+    display: inline;
+}
+
+.form-button-secondary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    margin-top: 1rem;
+}
+
+.form-button-secondary:hover {
+    border-color: var(--text-muted);
+}
+
+.text-muted {
+    color: var(--text-muted);
+}
+
+/* Login */
+.login-subtitle {
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}
+
+.login-loading {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-top: 0.75rem;
+}
+
+.login-error {
+    background: rgba(255, 75, 75, 0.15);
+    color: var(--accent);
+    padding: 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+}
+
 /* HTMX loading indicators */
 .htmx-indicator {
     opacity: 0;

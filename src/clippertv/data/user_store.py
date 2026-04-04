@@ -5,21 +5,33 @@ from datetime import datetime
 
 from ..auth.crypto import CredentialEncryption
 from ..auth.service import AuthService
-from .models import ClipperCard, ClipperCardCreate, User, UserCreate
+from .models import ClipperCard, User
 
 
 def _parse_dt(val) -> datetime:
     return datetime.fromisoformat(val) if val else datetime.now()
 
 
-def _row_to_user(row, *, created_at_idx: int = 3, updated_at_idx: int = 4) -> User:
+def _row_to_user(row) -> User:
+    """Map a row from the full user SELECT to a User model.
+
+    Expected columns: id, email, name, credentials_encrypted,
+    needs_reauth, created_at, updated_at
+    """
     return User(
         id=row[0],
         email=row[1],
         name=row[2],
-        created_at=_parse_dt(row[created_at_idx]),
-        updated_at=_parse_dt(row[updated_at_idx]),
+        credentials_encrypted=row[3],
+        needs_reauth=bool(row[4]),
+        created_at=_parse_dt(row[5]),
+        updated_at=_parse_dt(row[6]),
     )
+
+
+_USER_COLUMNS = (
+    "id, email, name, credentials_encrypted, needs_reauth, created_at, updated_at"
+)
 
 
 def _row_to_card(row) -> ClipperCard:
@@ -27,18 +39,12 @@ def _row_to_card(row) -> ClipperCard:
         id=row[0],
         user_id=row[1],
         account_number=row[2],
-        card_serial=row[3],
-        rider_name=row[4],
-        credentials_encrypted=row[5],
-        is_primary=bool(row[6]),
-        created_at=_parse_dt(row[7]),
+        rider_name=row[3],
+        created_at=_parse_dt(row[4]),
     )
 
 
-_CARD_COLUMNS = (
-    "id, user_id, account_number, card_serial, rider_name,"
-    " credentials_encrypted, is_primary, created_at"
-)
+_CARD_COLUMNS = "id, user_id, account_number, rider_name, created_at"
 
 
 class UserStore:
@@ -72,30 +78,35 @@ class UserStore:
 
     # --- Users ---
 
-    def create_user(self, user_data: UserCreate) -> User | None:
-        """Register new user account."""
-        existing = self.get_user_by_email(user_data.email)
+    def create_user(self, email: str, password: str) -> User:
+        """Register new user from Clipper credentials."""
+        existing = self.get_user_by_email(email)
         if existing:
-            raise ValueError(f"User with email {user_data.email} already exists")
+            raise ValueError(f"User with email {email} already exists")
 
         user_id = str(uuid.uuid4())
-        password_hash = self.auth.hash_password(user_data.password)
+        password_hash = self.auth.hash_password(password)
+        credentials_encrypted = self.crypto.encrypt_credentials(email, password)
         now = datetime.now().isoformat()
 
         self.client.execute(
             """
-            INSERT INTO users (id, email, password_hash, name, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO users
+                (id, email, password_hash, name, credentials_encrypted,
+                 needs_reauth, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, 0, ?, ?)
             """,
-            [user_id, user_data.email, password_hash, user_data.name, now, now],
+            [user_id, email, password_hash, None, credentials_encrypted, now, now],
         )
         self.client.commit()
-        return self.get_user_by_id(user_id)
+        user = self.get_user_by_id(user_id)
+        assert user is not None
+        return user
 
     def get_user_by_email(self, email: str) -> User | None:
         """Find user by email address."""
         result = self.client.execute(
-            "SELECT id, email, name, created_at, updated_at FROM users WHERE email = ?",
+            f"SELECT {_USER_COLUMNS} FROM users WHERE email = ?",
             [email],
         )
         row = result.fetchone()
@@ -104,77 +115,93 @@ class UserStore:
     def get_user_by_id(self, user_id: str) -> User | None:
         """Find user by ID."""
         result = self.client.execute(
-            "SELECT id, email, name, created_at, updated_at FROM users WHERE id = ?",
+            f"SELECT {_USER_COLUMNS} FROM users WHERE id = ?",
             [user_id],
         )
         row = result.fetchone()
         return _row_to_user(row) if row else None
 
     def verify_user_credentials(self, email: str, password: str) -> User | None:
-        """Authenticate user with email and password."""
+        """Authenticate user with email and password (bcrypt check)."""
         result = self.client.execute(
-            "SELECT id, email, name, password_hash, created_at, updated_at"
-            " FROM users WHERE email = ?",
+            f"SELECT password_hash, {_USER_COLUMNS} FROM users WHERE email = ?",
             [email],
         )
         row = result.fetchone()
         if not row:
             return None
-        if not self.auth.verify_password(password, row[3]):
+        if not self.auth.verify_password(password, row[0]):
             return None
-        return _row_to_user(row, created_at_idx=4, updated_at_idx=5)
+        # User columns start at index 1 (after password_hash)
+        return _row_to_user(row[1:])
+
+    def update_user_credentials(self, user_id: str, email: str, password: str) -> None:
+        """Update both bcrypt hash and encrypted creds (after Clipper re-auth)."""
+        password_hash = self.auth.hash_password(password)
+        credentials_encrypted = self.crypto.encrypt_credentials(email, password)
+        now = datetime.now().isoformat()
+        self.client.execute(
+            "UPDATE users SET password_hash = ?, credentials_encrypted = ?,"
+            " needs_reauth = 0, updated_at = ? WHERE id = ?",
+            [password_hash, credentials_encrypted, now, user_id],
+        )
+        self.client.commit()
+
+    def set_needs_reauth(self, user_id: str, value: bool) -> None:
+        """Toggle the needs_reauth flag on a user."""
+        self.client.execute(
+            "UPDATE users SET needs_reauth = ? WHERE id = ?",
+            [int(value), user_id],
+        )
+        self.client.commit()
+
+    def get_all_users_with_credentials(self) -> list[User]:
+        """Get all users that have stored Clipper credentials."""
+        result = self.client.execute(
+            f"SELECT {_USER_COLUMNS} FROM users"
+            " WHERE credentials_encrypted IS NOT NULL"
+            " ORDER BY created_at ASC",
+        )
+        return [_row_to_user(row) for row in result.fetchall()]
+
+    def decrypt_user_credentials(self, user: User) -> dict | None:
+        """Decrypt Clipper credentials from a User object."""
+        if not user.credentials_encrypted:
+            return None
+        return self.crypto.decrypt_credentials(user.credentials_encrypted)
 
     # --- Clipper Cards ---
 
-    def add_clipper_card(
-        self, user_id: str, card_data: ClipperCardCreate
-    ) -> ClipperCard | None:
-        """Associate Clipper card with user account."""
-        existing = self.client.execute(
-            "SELECT id FROM clipper_cards WHERE user_id = ? AND account_number = ?",
-            [user_id, card_data.account_number],
-        ).fetchone()
-        if existing:
-            raise ValueError(
-                f"Card {card_data.account_number} already exists for this user"
-            )
+    def discover_and_sync_cards(
+        self, user_id: str, account_numbers: list[str]
+    ) -> list[ClipperCard]:
+        """Create card records for newly discovered account numbers.
 
-        card_id = str(uuid.uuid4())
-        now = datetime.now().isoformat()
+        Skips account numbers that already exist for this user.
+        New cards get auto-generated rider names ("Card 1", "Card 2", ...).
+        Returns all cards for the user after sync.
+        """
+        existing = self.get_user_clipper_cards(user_id)
+        existing_accounts = {c.account_number for c in existing}
+        next_num = len(existing) + 1
 
-        credentials_encrypted = None
-        if card_data.credentials:
-            credentials_encrypted = self.crypto.encrypt_credentials(
-                card_data.credentials["username"],
-                card_data.credentials["password"],
-            )
-
-        if card_data.is_primary:
+        for acct in account_numbers:
+            if acct in existing_accounts:
+                continue
+            card_id = str(uuid.uuid4())
+            now = datetime.now().isoformat()
             self.client.execute(
-                "UPDATE clipper_cards SET is_primary = 0 WHERE user_id = ?",
-                [user_id],
+                """
+                INSERT INTO clipper_cards
+                    (id, user_id, account_number, rider_name, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                [card_id, user_id, acct, f"Card {next_num}", now],
             )
+            next_num += 1
 
-        self.client.execute(
-            """
-            INSERT INTO clipper_cards
-                (id, user_id, account_number, card_serial, rider_name,
-                 credentials_encrypted, is_primary, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            [
-                card_id,
-                user_id,
-                card_data.account_number,
-                card_data.card_serial,
-                card_data.rider_name,
-                credentials_encrypted,
-                card_data.is_primary,
-                now,
-            ],
-        )
         self.client.commit()
-        return self.get_clipper_card(card_id)
+        return self.get_user_clipper_cards(user_id)
 
     def get_clipper_card(self, card_id: str) -> ClipperCard | None:
         """Get Clipper card by ID."""
@@ -189,57 +216,16 @@ class UserStore:
         """Get all Clipper cards for a user."""
         result = self.client.execute(
             f"SELECT {_CARD_COLUMNS} FROM clipper_cards"
-            " WHERE user_id = ? ORDER BY is_primary DESC, created_at ASC",
+            " WHERE user_id = ? ORDER BY created_at ASC",
             [user_id],
         )
         return [_row_to_card(row) for row in result.fetchall()]
 
-    def get_all_cards_with_credentials(self) -> list[ClipperCard]:
-        """Get all clipper cards that have stored credentials."""
-        result = self.client.execute(
-            f"SELECT {_CARD_COLUMNS} FROM clipper_cards"
-            " WHERE credentials_encrypted IS NOT NULL"
-            " ORDER BY user_id, created_at ASC",
-        )
-        return [_row_to_card(row) for row in result.fetchall()]
-
-    def decrypt_card_credentials(self, card: ClipperCard) -> dict | None:
-        """Decrypt Clipper credentials from a card object."""
-        if not card.credentials_encrypted:
-            return None
-        return self.crypto.decrypt_credentials(card.credentials_encrypted)
-
-    def get_decrypted_credentials(self, card_id: str) -> dict | None:
-        """Get decrypted Clipper credentials by card ID."""
-        card = self.get_clipper_card(card_id)
-        if not card:
-            return None
-        return self.decrypt_card_credentials(card)
-
-    def update_card_credentials(
-        self, card_id: str, username: str, password: str
-    ) -> None:
-        """Encrypt and store new Clipper credentials for a card."""
-        encrypted = self.crypto.encrypt_credentials(username, password)
+    def update_card_rider_name(self, card_id: str, rider_name: str) -> None:
+        """Rename a Clipper card."""
         self.client.execute(
-            "UPDATE clipper_cards SET credentials_encrypted = ? WHERE id = ?",
-            [encrypted, card_id],
-        )
-        self.client.commit()
-
-    def update_clipper_card_primary(self, card_id: str, is_primary: bool) -> None:
-        """Update primary status of a Clipper card."""
-        card = self.get_clipper_card(card_id)
-        if not card:
-            raise ValueError(f"Card {card_id} not found")
-        if is_primary:
-            self.client.execute(
-                "UPDATE clipper_cards SET is_primary = 0 WHERE user_id = ?",
-                [card.user_id],
-            )
-        self.client.execute(
-            "UPDATE clipper_cards SET is_primary = ? WHERE id = ?",
-            [is_primary, card_id],
+            "UPDATE clipper_cards SET rider_name = ? WHERE id = ?",
+            [rider_name, card_id],
         )
         self.client.commit()
 

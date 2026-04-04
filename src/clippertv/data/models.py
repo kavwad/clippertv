@@ -6,11 +6,17 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class User(BaseModel):
-    """User account model."""
+    """User account model — identity is a Clipper account."""
 
     id: str = Field(..., description="Unique user identifier")
-    email: EmailStr = Field(..., description="User email address")
+    email: EmailStr = Field(..., description="Clipper account email")
     name: str | None = Field(None, description="User's display name")
+    credentials_encrypted: str | None = Field(
+        None, description="Fernet-encrypted Clipper password for scraping"
+    )
+    needs_reauth: bool = Field(
+        default=False, description="Set when scheduler detects stale credentials"
+    )
     created_at: datetime = Field(
         default_factory=datetime.now, description="Account creation timestamp"
     )
@@ -22,23 +28,6 @@ class User(BaseModel):
         from_attributes = True
 
 
-class UserCreate(BaseModel):
-    """User registration payload."""
-
-    email: EmailStr = Field(..., description="User email address")
-    password: str = Field(
-        ..., description="User password (will be hashed before storage)", min_length=8
-    )
-    name: str | None = Field(None, description="User's display name")
-
-
-class UserLogin(BaseModel):
-    """User login payload."""
-
-    email: EmailStr = Field(..., description="User email address")
-    password: str = Field(..., description="User password")
-
-
 class ClipperCard(BaseModel):
     """Clipper card associated with user."""
 
@@ -47,17 +36,8 @@ class ClipperCard(BaseModel):
     account_number: str = Field(
         ..., description="Clipper account number (long form, e.g. '100005510894')"
     )
-    card_serial: str | None = Field(
-        None, description="Physical card serial number (short form, e.g. '1202425091')"
-    )
     rider_name: str = Field(
-        ..., description="Friendly name for this card (e.g., 'Work Card')"
-    )
-    credentials_encrypted: str | None = Field(
-        None, description="Encrypted Clipper account credentials"
-    )
-    is_primary: bool = Field(
-        default=False, description="Whether this is the user's primary card"
+        ..., description="Friendly name for this card (e.g., 'Card 1')"
     )
     created_at: datetime = Field(
         default_factory=datetime.now, description="Card registration timestamp"
@@ -65,24 +45,6 @@ class ClipperCard(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class ClipperCardCreate(BaseModel):
-    """Clipper card registration payload."""
-
-    account_number: str = Field(
-        ..., description="Clipper account number (long form, e.g. '100005510894')"
-    )
-    card_serial: str | None = Field(
-        None, description="Physical card serial number (optional)"
-    )
-    rider_name: str = Field(..., description="Friendly name for this card")
-    credentials: dict[str, str] | None = Field(
-        None, description="Clipper account credentials (username, password)"
-    )
-    is_primary: bool = Field(
-        default=False, description="Whether this is the primary card"
-    )
 
 
 class AuthToken(BaseModel):

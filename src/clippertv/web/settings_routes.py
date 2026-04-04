@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from clippertv.data.models import ClipperCardCreate, User
+from clippertv.data.models import User
+from clippertv.ingest.clipper import validate_and_discover
 from clippertv.web.auth import get_user_store, require_auth
 
 router = APIRouter(prefix="/settings")
@@ -27,35 +29,22 @@ async def settings_page(request: Request, user: User = Depends(require_auth)):
     )
 
 
-@router.post("/cards", response_class=HTMLResponse)
-async def add_card(
+@router.post("/cards/{card_id}/rename", response_class=HTMLResponse)
+async def rename_card(
     request: Request,
+    card_id: str,
     user: User = Depends(require_auth),
-    account_number: str = Form(...),
-    card_serial: str = Form(""),
     rider_name: str = Form(...),
-    clipper_email: str = Form(""),
-    clipper_password: str = Form(""),
 ):
-    """Add a new clipper card. Returns card row partial for HTMX."""
+    """Rename a clipper card. Returns updated card row partial."""
     store = get_user_store()
+    card = store.get_clipper_card(card_id)
 
-    creds = None
-    if clipper_email and clipper_password:
-        creds = {"username": clipper_email, "password": clipper_password}
+    if not card or card.user_id != user.id:
+        return Response("Card not found", status_code=404)
 
-    card_data = ClipperCardCreate(
-        account_number=account_number,
-        card_serial=card_serial or None,
-        rider_name=rider_name,
-        credentials=creds,
-    )
-
-    try:
-        card = store.add_clipper_card(user.id, card_data)
-    except ValueError as e:
-        return Response(str(e), status_code=400)
-
+    store.update_card_rider_name(card_id, rider_name)
+    card = store.get_clipper_card(card_id)
     return templates.TemplateResponse(
         request,
         "partials/card_row.html",
@@ -79,19 +68,36 @@ async def delete_card(
     return Response(status_code=200)
 
 
-@router.post("/cards/{card_id}/credentials")
-async def update_credentials(
-    card_id: str,
+@router.post("/refresh-cards", response_class=HTMLResponse)
+async def refresh_cards(
+    request: Request,
     user: User = Depends(require_auth),
-    clipper_email: str = Form(...),
-    clipper_password: str = Form(...),
 ):
-    """Update Clipper credentials for a card."""
+    """Re-validate Clipper credentials and discover new cards."""
     store = get_user_store()
-    card = store.get_clipper_card(card_id)
+    creds = store.decrypt_user_credentials(user)
 
-    if not card or card.user_id != user.id:
-        return Response("Card not found", status_code=404)
+    if not creds:
+        return Response("No stored credentials", status_code=400)
 
-    store.update_card_credentials(card_id, clipper_email, clipper_password)
-    return Response("Credentials updated", status_code=200)
+    account_numbers = await asyncio.to_thread(
+        validate_and_discover, creds["username"], creds["password"]
+    )
+
+    if account_numbers is None:
+        store.set_needs_reauth(user.id, True)
+        return Response(
+            "Could not connect to Clipper. Your password may have changed.",
+            status_code=401,
+        )
+
+    cards = (
+        store.discover_and_sync_cards(user.id, account_numbers)
+        if account_numbers
+        else store.get_user_clipper_cards(user.id)
+    )
+    return templates.TemplateResponse(
+        request,
+        "partials/card_list.html",
+        {"cards": cards},
+    )

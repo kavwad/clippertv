@@ -3,16 +3,24 @@
 {% block content %}
 <div class="login-container">
     <h1>ClipperTV</h1>
+    <p class="login-subtitle">Sign in with your Clipper account</p>
 
-    {% if error %}
-    <div class="login-error">{{ error }}</div>
-    {% endif %}
+    <div id="login-error">
+        {% if error %}
+        <div class="login-error">{{ error }}</div>
+        {% endif %}
+    </div>
 
-    <form method="post" action="/login" class="login-form">
+    <form hx-post="/login"
+          hx-target="#login-error"
+          hx-swap="innerHTML"
+          hx-indicator="#login-spinner"
+          hx-disabled-elt="button[type='submit']"
+          class="login-form">
         <input
             type="email"
             name="email"
-            placeholder="Email"
+            placeholder="Clipper email"
             required
             autocomplete="email"
             class="form-input"
@@ -20,12 +28,17 @@
         <input
             type="password"
             name="password"
-            placeholder="Password"
+            placeholder="Clipper password"
             required
             autocomplete="current-password"
             class="form-input"
         >
-        <button type="submit" class="form-button">Log in</button>
+        <button type="submit" class="form-button">
+            Sign in
+        </button>
+        <div id="login-spinner" class="htmx-indicator login-loading">
+            Verifying with Clipper...
+        </div>
     </form>
 </div>
 {% endblock %}

@@ -1,0 +1,6 @@
+{% for card in cards %}
+{% include "partials/card_row.html" %}
+{% endfor %}
+{% if not cards %}
+<p class="text-muted">No cards found.</p>
+{% endif %}

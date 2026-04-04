@@ -6,7 +6,6 @@ import pytest
 
 from clippertv.auth.crypto import CredentialEncryption
 from clippertv.auth.service import AuthService
-from clippertv.data.models import ClipperCardCreate, UserCreate
 from clippertv.data.turso_client import get_turso_client
 from clippertv.data.user_store import UserStore
 
@@ -44,256 +43,171 @@ def _unique_email(prefix: str = "test") -> str:
     return f"{prefix}_{uuid4().hex[:8]}@example.com"
 
 
-@pytest.fixture
-def test_user_data():
-    """Create test user data."""
-    return UserCreate(
-        email=_unique_email("test"),
-        password="secure_password_123",
-        name="Test User",
-    )
-
-
 class TestUserStore:
     """Integration tests for UserStore."""
 
-    def test_create_user(self, user_store, test_user_data):
-        """Test creating a new user."""
-        user = user_store.create_user(test_user_data)
+    def test_create_user(self, user_store):
+        """Test creating a new user with Clipper credentials."""
+        email = _unique_email("create")
+        user = user_store.create_user(email, "clipper_password_123")
 
         assert user.id
-        assert user.email == test_user_data.email
-        assert user.name == test_user_data.name
-        assert user.created_at
-        assert user.updated_at
+        assert user.email == email
+        assert user.credentials_encrypted is not None
+        assert user.needs_reauth is False
 
     def test_create_duplicate_user_raises_error(self, user_store):
         """Test that creating duplicate user raises error."""
-        user_data = UserCreate(
-            email=_unique_email("duplicate"),
-            password="password123",
-            name="Duplicate User",
-        )
+        email = _unique_email("duplicate")
+        user_store.create_user(email, "password123")
 
-        # Create first user
-        user_store.create_user(user_data)
-
-        # Attempt to create duplicate should raise error
         with pytest.raises(ValueError, match="already exists"):
-            user_store.create_user(user_data)
+            user_store.create_user(email, "password123")
 
     def test_get_user_by_email(self, user_store):
         """Test retrieving user by email."""
-        # Create user
-        user_data = UserCreate(
-            email=_unique_email("findme"),
-            password="password123",
-            name="Find Me",
-        )
-        created_user = user_store.create_user(user_data)
+        email = _unique_email("findme")
+        created = user_store.create_user(email, "password123")
 
-        # Retrieve user
-        found_user = user_store.get_user_by_email(user_data.email)
-
-        assert found_user is not None
-        assert found_user.id == created_user.id
-        assert found_user.email == user_data.email
+        found = user_store.get_user_by_email(email)
+        assert found is not None
+        assert found.id == created.id
 
     def test_get_user_by_email_not_found(self, user_store):
         """Test retrieving non-existent user returns None."""
-        user = user_store.get_user_by_email("nonexistent@example.com")
-        assert user is None
+        assert user_store.get_user_by_email("nonexistent@example.com") is None
 
     def test_get_user_by_id(self, user_store):
         """Test retrieving user by ID."""
-        # Create user
-        user_data = UserCreate(email=_unique_email("findbyid"), password="password123")
-        created_user = user_store.create_user(user_data)
+        email = _unique_email("findbyid")
+        created = user_store.create_user(email, "password123")
 
-        # Retrieve user by ID
-        found_user = user_store.get_user_by_id(created_user.id)
-
-        assert found_user is not None
-        assert found_user.id == created_user.id
-        assert found_user.email == user_data.email
+        found = user_store.get_user_by_id(created.id)
+        assert found is not None
+        assert found.email == email
 
     def test_verify_user_credentials_success(self, user_store):
         """Test successful credential verification."""
-        # Create user
-        user_data = UserCreate(
-            email=_unique_email("verify"),
-            password="correct_password",
-        )
-        created_user = user_store.create_user(user_data)
+        email = _unique_email("verify")
+        created = user_store.create_user(email, "correct_password")
 
-        # Verify correct credentials
-        verified_user = user_store.verify_user_credentials(
-            email=user_data.email, password="correct_password"
-        )
-
-        assert verified_user is not None
-        assert verified_user.id == created_user.id
+        verified = user_store.verify_user_credentials(email, "correct_password")
+        assert verified is not None
+        assert verified.id == created.id
 
     def test_verify_user_credentials_wrong_password(self, user_store):
         """Test credential verification with wrong password."""
-        # Create user
-        user_data = UserCreate(
-            email=_unique_email("wrongpass"),
-            password="correct_password",
-        )
-        user_store.create_user(user_data)
+        email = _unique_email("wrongpass")
+        user_store.create_user(email, "correct_password")
 
-        # Verify with wrong password
-        verified_user = user_store.verify_user_credentials(
-            email=user_data.email, password="wrong_password"
-        )
-
-        assert verified_user is None
+        assert user_store.verify_user_credentials(email, "wrong_password") is None
 
     def test_verify_user_credentials_nonexistent_email(self, user_store):
         """Test credential verification with non-existent email."""
-        verified_user = user_store.verify_user_credentials(
-            email="nonexistent@example.com", password="any_password"
-        )
+        assert user_store.verify_user_credentials("nope@example.com", "any") is None
 
-        assert verified_user is None
+    def test_update_user_credentials(self, user_store):
+        """Test updating credentials after Clipper re-auth."""
+        email = _unique_email("update_creds")
+        user = user_store.create_user(email, "old_password")
+
+        user_store.update_user_credentials(user.id, email, "new_password")
+
+        # Old password should fail, new should pass
+        assert user_store.verify_user_credentials(email, "old_password") is None
+        assert user_store.verify_user_credentials(email, "new_password") is not None
+
+        # Encrypted creds should also be updated
+        updated = user_store.get_user_by_id(user.id)
+        creds = user_store.decrypt_user_credentials(updated)
+        assert creds["password"] == "new_password"
+
+    def test_set_needs_reauth(self, user_store):
+        """Test toggling needs_reauth flag."""
+        email = _unique_email("reauth")
+        user = user_store.create_user(email, "password123")
+        assert user.needs_reauth is False
+
+        user_store.set_needs_reauth(user.id, True)
+        updated = user_store.get_user_by_id(user.id)
+        assert updated.needs_reauth is True
+
+        user_store.set_needs_reauth(user.id, False)
+        updated = user_store.get_user_by_id(user.id)
+        assert updated.needs_reauth is False
+
+    def test_get_all_users_with_credentials(self, user_store):
+        """Test retrieving users that have stored credentials."""
+        email = _unique_email("with_creds")
+        user_store.create_user(email, "password123")
+
+        users = user_store.get_all_users_with_credentials()
+        assert any(u.email == email for u in users)
+
+    def test_decrypt_user_credentials(self, user_store):
+        """Test decrypting stored Clipper credentials."""
+        email = _unique_email("decrypt")
+        user = user_store.create_user(email, "my_clipper_pass")
+
+        creds = user_store.decrypt_user_credentials(user)
+        assert creds is not None
+        assert creds["username"] == email
+        assert creds["password"] == "my_clipper_pass"
 
 
 class TestClipperCardStore:
     """Integration tests for Clipper card operations."""
 
-    def test_add_clipper_card(self, user_store):
-        """Test adding a Clipper card to a user."""
-        # Create user first
-        user_data = UserCreate(email=_unique_email("carduser"), password="password123")
-        user = user_store.create_user(user_data)
+    def test_discover_and_sync_cards(self, user_store):
+        """Test auto-discovery of cards from account numbers."""
+        email = _unique_email("discover")
+        user = user_store.create_user(email, "password123")
 
-        # Add clipper card
-        card_data = ClipperCardCreate(
-            account_number="123456789", rider_name="Test Card", is_primary=True
-        )
-        card = user_store.add_clipper_card(user.id, card_data)
-
-        assert card.id
-        assert card.user_id == user.id
-        assert card.account_number == "123456789"
-        assert card.rider_name == "Test Card"
-        assert card.is_primary is True
-
-    def test_add_clipper_card_with_credentials(self, user_store):
-        """Test adding Clipper card with encrypted credentials."""
-        # Create user
-        user_data = UserCreate(email=_unique_email("credcard"), password="password123")
-        user = user_store.create_user(user_data)
-
-        # Add card with credentials
-        card_data = ClipperCardCreate(
-            account_number="987654321",
-            rider_name="Card with Creds",
-            credentials={"username": "clipper_user", "password": "clipper_pass"},
-        )
-        card = user_store.add_clipper_card(user.id, card_data)
-
-        assert card.credentials_encrypted is not None
-
-        # Verify credentials can be decrypted
-        decrypted = user_store.get_decrypted_credentials(card.id)
-        assert decrypted is not None
-        assert decrypted["username"] == "clipper_user"
-        assert decrypted["password"] == "clipper_pass"
-
-    def test_add_duplicate_card_raises_error(self, user_store):
-        """Test that adding duplicate card raises error."""
-        # Create user
-        user_data = UserCreate(email=_unique_email("dupcard"), password="password123")
-        user = user_store.create_user(user_data)
-
-        # Add first card
-        card_data = ClipperCardCreate(
-            account_number="111222333", rider_name="First Card"
-        )
-        user_store.add_clipper_card(user.id, card_data)
-
-        # Attempt to add duplicate
-        with pytest.raises(ValueError, match="already exists"):
-            user_store.add_clipper_card(user.id, card_data)
-
-    def test_get_user_clipper_cards(self, user_store):
-        """Test retrieving all cards for a user."""
-        # Create user
-        user_data = UserCreate(
-            email=_unique_email("multicards"),
-            password="password123",
-        )
-        user = user_store.create_user(user_data)
-
-        # Add multiple cards
-        card1 = ClipperCardCreate(
-            account_number="111111111", rider_name="Card 1", is_primary=False
-        )
-        card2 = ClipperCardCreate(
-            account_number="222222222", rider_name="Card 2", is_primary=True
-        )
-
-        user_store.add_clipper_card(user.id, card1)
-        user_store.add_clipper_card(user.id, card2)
-
-        # Get all cards
-        cards = user_store.get_user_clipper_cards(user.id)
+        cards = user_store.discover_and_sync_cards(user.id, ["111111111", "222222222"])
 
         assert len(cards) == 2
-        # Primary card should be first
-        assert cards[0].is_primary is True
-        assert cards[0].rider_name == "Card 2"
+        assert cards[0].rider_name == "Card 1"
+        assert cards[1].rider_name == "Card 2"
+        assert cards[0].account_number == "111111111"
 
-    def test_update_primary_card(self, user_store):
-        """Test updating primary card status."""
-        # Create user
-        user_data = UserCreate(
-            email=_unique_email("primarycard"),
-            password="password123",
-        )
-        user = user_store.create_user(user_data)
+    def test_discover_skips_existing_cards(self, user_store):
+        """Test that discovery doesn't duplicate existing cards."""
+        email = _unique_email("no_dup")
+        user = user_store.create_user(email, "password123")
 
-        # Add two cards
-        card1_data = ClipperCardCreate(
-            account_number="333333333", rider_name="Card 1", is_primary=True
-        )
-        card2_data = ClipperCardCreate(
-            account_number="444444444", rider_name="Card 2", is_primary=False
-        )
+        # First discovery
+        user_store.discover_and_sync_cards(user.id, ["111111111"])
 
-        card1 = user_store.add_clipper_card(user.id, card1_data)
-        card2 = user_store.add_clipper_card(user.id, card2_data)
+        # Second discovery with overlap + new
+        cards = user_store.discover_and_sync_cards(user.id, ["111111111", "333333333"])
 
-        # Update card2 to be primary
-        user_store.update_clipper_card_primary(card2.id, True)
+        assert len(cards) == 2
+        assert cards[1].rider_name == "Card 2"
 
-        # Verify card2 is now primary and card1 is not
-        updated_card2 = user_store.get_clipper_card(card2.id)
-        updated_card1 = user_store.get_clipper_card(card1.id)
+    def test_update_card_rider_name(self, user_store):
+        """Test renaming a card."""
+        email = _unique_email("rename")
+        user = user_store.create_user(email, "password123")
+        cards = user_store.discover_and_sync_cards(user.id, ["123456789"])
 
-        assert updated_card2.is_primary is True
-        assert updated_card1.is_primary is False
+        user_store.update_card_rider_name(cards[0].id, "My BART Card")
+
+        updated = user_store.get_clipper_card(cards[0].id)
+        assert updated.rider_name == "My BART Card"
 
     def test_delete_clipper_card(self, user_store):
         """Test deleting a Clipper card."""
-        # Create user
-        user_data = UserCreate(
-            email=_unique_email("deletecard"),
-            password="password123",
-        )
-        user = user_store.create_user(user_data)
+        email = _unique_email("delete")
+        user = user_store.create_user(email, "password123")
+        cards = user_store.discover_and_sync_cards(user.id, ["555555555"])
 
-        # Add card
-        card_data = ClipperCardCreate(
-            account_number="555555555", rider_name="Card to Delete"
-        )
-        card = user_store.add_clipper_card(user.id, card_data)
+        user_store.delete_clipper_card(cards[0].id)
+        assert user_store.get_clipper_card(cards[0].id) is None
 
-        # Delete card
-        user_store.delete_clipper_card(card.id)
+    def test_get_user_clipper_cards_empty(self, user_store):
+        """Test getting cards for user with no cards."""
+        email = _unique_email("nocards")
+        user = user_store.create_user(email, "password123")
 
-        # Verify card is deleted
-        deleted_card = user_store.get_clipper_card(card.id)
-        assert deleted_card is None
+        cards = user_store.get_user_clipper_cards(user.id)
+        assert cards == []

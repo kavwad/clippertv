@@ -55,6 +55,10 @@ class AuthenticatedUser(BaseUser):
     def identity(self) -> str:
         return self.user.id
 
+    @property
+    def needs_reauth(self) -> bool:
+        return self.user.needs_reauth
+
 
 class CookieAuthBackend(AuthenticationBackend):
     """Read JWT from httpOnly cookie and resolve to User."""
