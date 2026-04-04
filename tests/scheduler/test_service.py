@@ -3,18 +3,17 @@
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
-from clippertv.data.models import ClipperCard
+from clippertv.data.models import User
 from clippertv.scheduler.service import IngestionResult, main, run_ingestion
 
-_SAMPLE_CARD = ClipperCard(
-    id="card-1",
-    user_id="user-1",
-    account_number="1234",
-    card_serial=None,
-    rider_name="Alice Card",
+_SAMPLE_USER = User(
+    id="user-1",
+    email="alice@example.com",
+    name=None,
     credentials_encrypted="encrypted-data",
-    is_primary=True,
+    needs_reauth=False,
     created_at=datetime.now(),
+    updated_at=datetime.now(),
 )
 
 _SAMPLE_CSV = (
@@ -26,13 +25,14 @@ _SAMPLE_CSV = (
 
 
 def _mock_user_store():
-    """Build a mock UserStore with one card."""
+    """Build a mock UserStore with one user."""
     store = MagicMock()
-    store.get_all_cards_with_credentials.return_value = [_SAMPLE_CARD]
-    store.decrypt_card_credentials.return_value = {
+    store.get_all_users_with_credentials.return_value = [_SAMPLE_USER]
+    store.decrypt_user_credentials.return_value = {
         "username": "alice@example.com",
         "password": "secret",
     }
+    store.get_user_clipper_cards.return_value = []
     return store
 
 
@@ -58,8 +58,9 @@ def test_run_ingestion_success(mock_build, mock_login, mock_download, mock_turso
 @patch("clippertv.scheduler.service.login")
 @patch("clippertv.scheduler.service._build_user_store")
 def test_run_ingestion_login_failure(mock_build, mock_login, mock_turso):
-    """Login failure is captured as an error, not raised."""
-    mock_build.return_value = _mock_user_store()
+    """Login failure sets needs_reauth and captures error."""
+    store = _mock_user_store()
+    mock_build.return_value = store
     mock_login.side_effect = RuntimeError("bad credentials")
 
     results = run_ingestion(days=30)
@@ -67,6 +68,7 @@ def test_run_ingestion_login_failure(mock_build, mock_login, mock_turso):
     assert len(results) == 1
     assert results[0].error == "bad credentials"
     assert results[0].new_rows == 0
+    store.set_needs_reauth.assert_called_once_with("user-1", True)
 
 
 @patch("clippertv.scheduler.service.login")
@@ -84,14 +86,31 @@ def test_run_ingestion_dry_run(mock_build, mock_login):
 
 
 @patch("clippertv.scheduler.service._build_user_store")
-def test_run_ingestion_no_cards(mock_build):
-    """No cards with credentials returns empty results."""
+def test_run_ingestion_no_users(mock_build):
+    """No users with credentials returns empty results."""
     store = MagicMock()
-    store.get_all_cards_with_credentials.return_value = []
+    store.get_all_users_with_credentials.return_value = []
     mock_build.return_value = store
 
     results = run_ingestion()
     assert results == []
+
+
+@patch("clippertv.data.turso_store.TursoStore")
+@patch("clippertv.scheduler.service.download_transactions")
+@patch("clippertv.scheduler.service.login")
+@patch("clippertv.scheduler.service._build_user_store")
+def test_run_ingestion_discovers_cards(
+    mock_build, mock_login, mock_download, mock_turso
+):
+    """Ingestion auto-discovers cards from CSV account numbers."""
+    store = _mock_user_store()
+    mock_build.return_value = store
+    mock_download.return_value = [{"path": "test.csv", "content": _SAMPLE_CSV}]
+
+    run_ingestion(days=30)
+
+    store.discover_and_sync_cards.assert_called_once_with("user-1", ["1234"])
 
 
 @patch("clippertv.scheduler.service.run_ingestion")

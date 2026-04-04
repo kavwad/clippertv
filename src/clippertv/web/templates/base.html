@@ -21,6 +21,12 @@
             </form>
         </div>
     </nav>
+    {% if request.user.needs_reauth %}
+    <div class="reauth-banner">
+        Your Clipper credentials need updating.
+        <a href="/settings">Go to Settings</a> or log out and back in.
+    </div>
+    {% endif %}
     {% endif %}
     {% block content %}{% endblock %}
 

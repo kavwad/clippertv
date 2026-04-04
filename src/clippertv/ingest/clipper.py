@@ -147,6 +147,44 @@ def login(session: requests.Session, email: str, password: str) -> requests.Sess
     return session
 
 
+def validate_and_discover(email: str, password: str) -> list[str] | None:
+    """Validate Clipper credentials and discover associated card account numbers.
+
+    Tries a 7-day window first, then 30 days if no cards found.
+    Returns account_number list on success, or None if auth fails.
+    """
+    session = requests.Session()
+    session.headers.update({"User-Agent": USER_AGENT})
+
+    try:
+        login(session, email, password)
+    except Exception:
+        return None
+
+    today = date.today()
+
+    # Try 7 days first (fast), then 30 days if empty
+    for days in (7, 30):
+        start = (today - timedelta(days=days)).isoformat()
+        end = today.isoformat()
+
+        try:
+            csv_content = download_csv(session, start, end)
+        except Exception:
+            return []
+
+        if not csv_content:
+            continue
+
+        df = parse_csv(csv_content)
+        if df.empty:
+            continue
+
+        return sorted(df["account_number"].unique().tolist())
+
+    return []
+
+
 def format_clip_date(date_str: str) -> str:
     """Format a YYYY-MM-DD date string as 'Month Day, Year' for Clipper API."""
     if not date_str:

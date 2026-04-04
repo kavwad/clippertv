@@ -1,6 +1,6 @@
 """Scheduled ingestion service.
 
-Loads Clipper credentials from the database, downloads recent
+Loads Clipper credentials from the users table, downloads recent
 transactions, and ingests them. Can be triggered by launchd,
 systemd, cron, Railway cron, or any other scheduler.
 """
@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import sys
-from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -43,10 +42,11 @@ def run_ingestion(
     output_dir: str = "downloads",
     dry_run: bool = False,
 ) -> list[IngestionResult]:
-    """Download and ingest recent transactions for all accounts with credentials.
+    """Download and ingest recent transactions for all users with credentials.
 
-    Reads Clipper credentials from the database (clipper_cards table).
-    Groups cards by their Clipper login email to avoid duplicate logins.
+    Reads Clipper credentials from the users table. Each user corresponds
+    to one Clipper account. Downloads all cards' transactions and auto-discovers
+    new cards.
 
     Args:
         days: Number of days to look back.
@@ -61,29 +61,10 @@ def run_ingestion(
     from clippertv.data.turso_store import TursoStore
 
     store = _build_user_store()
-    cards = store.get_all_cards_with_credentials()
-    if not cards:
-        log.warning("No cards with credentials in database")
+    users = store.get_all_users_with_credentials()
+    if not users:
+        log.warning("No users with credentials in database")
         return []
-
-    # Decrypt credentials and group by Clipper login email
-    # (one login downloads CSVs for all cards under that account)
-    accounts_by_email: dict[str, dict] = {}
-    card_account_numbers: dict[str, list[str]] = defaultdict(list)
-
-    for card in cards:
-        creds = store.decrypt_card_credentials(card)
-        if not creds:
-            log.warning("Failed to decrypt credentials for card %s", card.id)
-            continue
-        email = creds["username"]
-        if email not in accounts_by_email:
-            accounts_by_email[email] = {
-                "email": email,
-                "password": creds["password"],
-                "label": email,
-            }
-        card_account_numbers[email].append(card.account_number)
 
     today = date.today()
     start_date = (today - timedelta(days=days)).isoformat()
@@ -92,17 +73,25 @@ def run_ingestion(
     turso = None if dry_run else TursoStore()
     results: list[IngestionResult] = []
 
-    for email, account in accounts_by_email.items():
+    for user in users:
+        creds = store.decrypt_user_credentials(user)
+        if not creds:
+            log.warning("Failed to decrypt credentials for user %s", user.id)
+            continue
+
+        email = creds["username"]
+        password = creds["password"]
         log.info("Processing account: %s", email)
 
         session = requests.Session()
         try:
-            login(session, account["email"], account["password"])
+            login(session, email, password)
             downloads = download_transactions(
                 session, output_dir, start_date, end_date, dry_run
             )
         except Exception as e:
             log.error("Download failed for %s: %s", email, e)
+            store.set_needs_reauth(user.id, True)
             results.append(IngestionResult(account=email, new_rows=0, error=str(e)))
             continue
 
@@ -110,21 +99,16 @@ def run_ingestion(
             results.append(IngestionResult(account=email, new_rows=0))
             continue
 
+        # Collect all account numbers from downloaded CSVs and ingest
         total = 0
-        known_accounts = set(card_account_numbers[email])
+        all_account_numbers: set[str] = set()
         for download in downloads:
             df = parse_csv(download["content"])
             if df.empty:
                 continue
             for acct_num, card_df in df.groupby("account_number"):
                 acct_str = str(acct_num)
-                if acct_str not in known_accounts:
-                    log.debug(
-                        "Skipping unknown account %s from %s",
-                        acct_str,
-                        email,
-                    )
-                    continue
+                all_account_numbers.add(acct_str)
                 assert turso is not None
                 total += ingest(
                     card_df,
@@ -132,6 +116,10 @@ def run_ingestion(
                     user_id=None,
                     store=turso,
                 )
+
+        # Auto-discover new cards from this download
+        if all_account_numbers:
+            store.discover_and_sync_cards(user.id, sorted(all_account_numbers))
 
         log.info("%s: %d new transactions", email, total)
         results.append(IngestionResult(account=email, new_rows=total))
