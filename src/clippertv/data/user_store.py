@@ -39,18 +39,12 @@ def _row_to_card(row) -> ClipperCard:
         id=row[0],
         user_id=row[1],
         account_number=row[2],
-        card_serial=row[3],
-        rider_name=row[4],
-        credentials_encrypted=row[5],
-        is_primary=bool(row[6]),
-        created_at=_parse_dt(row[7]),
+        rider_name=row[3],
+        created_at=_parse_dt(row[4]),
     )
 
 
-_CARD_COLUMNS = (
-    "id, user_id, account_number, card_serial, rider_name,"
-    " credentials_encrypted, is_primary, created_at"
-)
+_CARD_COLUMNS = "id, user_id, account_number, rider_name, created_at"
 
 
 class UserStore:
@@ -199,9 +193,8 @@ class UserStore:
             self.client.execute(
                 """
                 INSERT INTO clipper_cards
-                    (id, user_id, account_number, card_serial, rider_name,
-                     credentials_encrypted, is_primary, created_at)
-                VALUES (?, ?, ?, NULL, ?, NULL, 0, ?)
+                    (id, user_id, account_number, rider_name, created_at)
+                VALUES (?, ?, ?, ?, ?)
                 """,
                 [card_id, user_id, acct, f"Card {next_num}", now],
             )

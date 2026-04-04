@@ -36,16 +36,9 @@ class ClipperCard(BaseModel):
     account_number: str = Field(
         ..., description="Clipper account number (long form, e.g. '100005510894')"
     )
-    card_serial: str | None = Field(
-        None, description="Physical card serial number (short form)"
-    )
     rider_name: str = Field(
         ..., description="Friendly name for this card (e.g., 'Card 1')"
     )
-    credentials_encrypted: str | None = Field(
-        None, description="Legacy: encrypted credentials (now on users table)"
-    )
-    is_primary: bool = Field(default=False, description="Legacy: primary card flag")
     created_at: datetime = Field(
         default_factory=datetime.now, description="Card registration timestamp"
     )
