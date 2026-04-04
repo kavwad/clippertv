@@ -324,6 +324,35 @@ class UserStore:
         )
         self.client.commit()
 
+    def get_all_cards_with_credentials(self) -> list[ClipperCard]:
+        """Get all clipper cards that have stored credentials."""
+        result = self.client.execute(
+            """
+            SELECT id, user_id, account_number, card_serial, rider_name,
+                   credentials_encrypted, is_primary, created_at
+            FROM clipper_cards
+            WHERE credentials_encrypted IS NOT NULL
+            ORDER BY user_id, created_at ASC
+            """,
+        )
+        cards = []
+        for row in result.fetchall():
+            cards.append(
+                ClipperCard(
+                    id=row[0],
+                    user_id=row[1],
+                    account_number=row[2],
+                    card_serial=row[3],
+                    rider_name=row[4],
+                    credentials_encrypted=row[5],
+                    is_primary=bool(row[6]),
+                    created_at=datetime.fromisoformat(row[7])
+                    if row[7]
+                    else datetime.now(),
+                )
+            )
+        return cards
+
     def delete_clipper_card(self, card_id: str) -> None:
         """
         Delete a Clipper card.

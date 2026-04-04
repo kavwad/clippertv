@@ -1,19 +1,19 @@
 """Scheduled ingestion service.
 
-Platform-agnostic: call run_ingestion() from launchd, systemd, cron,
-or any other trigger. Loads accounts from clipper.toml, downloads
-recent transactions, and ingests them.
+Loads Clipper credentials from the database, downloads recent
+transactions, and ingests them. Can be triggered by launchd,
+systemd, cron, Railway cron, or any other scheduler.
 """
 
 from __future__ import annotations
 
 import logging
 import sys
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, timedelta
 
 from clippertv.ingest.clipper import (
-    _load_config,
     download_transactions,
     login,
     parse_csv,
@@ -30,17 +30,38 @@ class IngestionResult:
     error: str | None = None
 
 
+def _build_user_store():
+    """Build a UserStore from environment config."""
+    from clippertv.auth.crypto import CredentialEncryption
+    from clippertv.auth.service import AuthService
+    from clippertv.config import EnvConfig
+    from clippertv.data.turso_client import get_turso_client, initialize_database
+    from clippertv.data.user_store import UserStore
+
+    initialize_database()
+    key = EnvConfig.JWT_SECRET_KEY
+    enc_key = EnvConfig.ENCRYPTION_KEY
+    if not key or not enc_key:
+        raise ValueError("JWT_SECRET_KEY and ENCRYPTION_KEY must be set")
+    return UserStore(
+        client=get_turso_client(),
+        auth_service=AuthService(secret_key=key),
+        crypto=CredentialEncryption(encryption_key=enc_key),
+    )
+
+
 def run_ingestion(
     *,
-    config_path: str = "clipper.toml",
     days: int = 30,
     output_dir: str = "downloads",
     dry_run: bool = False,
 ) -> list[IngestionResult]:
-    """Download and ingest recent transactions for all configured accounts.
+    """Download and ingest recent transactions for all accounts with credentials.
+
+    Reads Clipper credentials from the database (clipper_cards table).
+    Groups cards by their Clipper login email to avoid duplicate logins.
 
     Args:
-        config_path: Path to clipper.toml.
         days: Number of days to look back.
         output_dir: Directory for downloaded CSVs.
         dry_run: If True, validate login only.
@@ -52,22 +73,40 @@ def run_ingestion(
 
     from clippertv.data.turso_store import TursoStore
 
-    config = _load_config(config_path)
-    accounts = config.get("accounts", [])
-    if not accounts:
-        log.warning("No accounts in %s", config_path)
+    store = _build_user_store()
+    cards = store.get_all_cards_with_credentials()
+    if not cards:
+        log.warning("No cards with credentials in database")
         return []
+
+    # Decrypt credentials and group by Clipper login email
+    # (one login downloads CSVs for all cards under that account)
+    accounts_by_email: dict[str, dict] = {}
+    card_account_numbers: dict[str, list[str]] = defaultdict(list)
+
+    for card in cards:
+        creds = store.get_decrypted_credentials(card.id)
+        if not creds:
+            log.warning("Failed to decrypt credentials for card %s", card.id)
+            continue
+        email = creds["username"]
+        if email not in accounts_by_email:
+            accounts_by_email[email] = {
+                "email": email,
+                "password": creds["password"],
+                "label": email,
+            }
+        card_account_numbers[email].append(card.account_number)
 
     today = date.today()
     start_date = (today - timedelta(days=days)).isoformat()
     end_date = today.isoformat()
 
-    store = None if dry_run else TursoStore()
+    turso = None if dry_run else TursoStore()
     results: list[IngestionResult] = []
 
-    for account in accounts:
-        name = account["name"]
-        log.info("Processing account: %s", name)
+    for email, account in accounts_by_email.items():
+        log.info("Processing account: %s", email)
 
         session = requests.Session()
         try:
@@ -76,30 +115,39 @@ def run_ingestion(
                 session, output_dir, start_date, end_date, dry_run
             )
         except Exception as e:
-            log.error("Download failed for %s: %s", name, e)
-            results.append(IngestionResult(account=name, new_rows=0, error=str(e)))
+            log.error("Download failed for %s: %s", email, e)
+            results.append(IngestionResult(account=email, new_rows=0, error=str(e)))
             continue
 
         if dry_run:
-            results.append(IngestionResult(account=name, new_rows=0))
+            results.append(IngestionResult(account=email, new_rows=0))
             continue
 
         total = 0
+        known_accounts = set(card_account_numbers[email])
         for download in downloads:
             df = parse_csv(download["content"])
             if df.empty:
                 continue
             for acct_num, card_df in df.groupby("account_number"):
-                assert store is not None
+                acct_str = str(acct_num)
+                if acct_str not in known_accounts:
+                    log.debug(
+                        "Skipping unknown account %s from %s",
+                        acct_str,
+                        email,
+                    )
+                    continue
+                assert turso is not None
                 total += ingest(
                     card_df,
-                    account_number=str(acct_num),
+                    account_number=acct_str,
                     user_id=None,
-                    store=store,
+                    store=turso,
                 )
 
-        log.info("%s: %d new transactions", name, total)
-        results.append(IngestionResult(account=name, new_rows=total))
+        log.info("%s: %d new transactions", email, total)
+        results.append(IngestionResult(account=email, new_rows=total))
 
     return results
 
@@ -108,12 +156,18 @@ def main(argv: list[str] | None = None) -> int:
     """CLI entry point for scheduled ingestion."""
     import argparse
 
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
     parser = argparse.ArgumentParser(
         description="Run scheduled Clipper CSV ingestion for all accounts."
     )
-    parser.add_argument("--config", default="clipper.toml", help="Path to clipper.toml")
     parser.add_argument(
-        "--days", type=int, default=30, help="Days to look back (default: 30)"
+        "--days",
+        type=int,
+        default=30,
+        help="Days to look back (default: 30)",
     )
     parser.add_argument("--output", default="downloads", help="Download directory")
     parser.add_argument("--dry-run", action="store_true", help="Validate login only")
@@ -127,7 +181,6 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     results = run_ingestion(
-        config_path=args.config,
         days=args.days,
         output_dir=args.output,
         dry_run=args.dry_run,
