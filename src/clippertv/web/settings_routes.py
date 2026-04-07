@@ -1,17 +1,25 @@
-"""Settings routes for managing Clipper cards."""
+"""Settings routes for managing Clipper cards and preferences."""
 
 from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
+from clippertv.config import config
 from clippertv.data.models import User
 from clippertv.ingest.clipper import validate_and_discover
 from clippertv.web.auth import get_user_store, require_auth
+
+_ALL_CATEGORIES = [
+    cat
+    for cat in config.transit_categories.color_map
+    if cat not in ("Unknown", "Other")
+]
 
 router = APIRouter(prefix="/settings")
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -22,10 +30,16 @@ async def settings_page(request: Request, user: User = Depends(require_auth)):
     """Render settings page with user's clipper cards."""
     store = get_user_store()
     cards = store.get_user_clipper_cards(user.id)
+    selected = user.display_categories or _ALL_CATEGORIES
     return templates.TemplateResponse(
         request,
         "settings.html",
-        {"user": user, "cards": cards},
+        {
+            "user": user,
+            "cards": cards,
+            "all_categories": _ALL_CATEGORIES,
+            "selected_categories": selected,
+        },
     )
 
 
@@ -66,6 +80,19 @@ async def delete_card(
 
     store.delete_clipper_card(card_id)
     return Response(status_code=200)
+
+
+@router.post("/categories")
+async def save_categories(
+    user: User = Depends(require_auth),
+    categories: Annotated[list[str], Form()] = [],
+):
+    """Save display category preferences."""
+    store = get_user_store()
+    # None means "show all" (default behavior)
+    cats = categories if categories else None
+    store.update_display_categories(user.id, cats)
+    return Response(status_code=204)
 
 
 @router.post("/refresh-cards", response_class=HTMLResponse)

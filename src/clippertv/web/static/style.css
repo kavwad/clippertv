@@ -233,6 +233,26 @@ th {
     color: var(--text-muted);
 }
 
+.category-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    margin: 0.75rem 0;
+}
+
+.category-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.9rem;
+}
+
+.save-status {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    margin-left: 0.5rem;
+}
+
 /* Login */
 .login-subtitle {
     color: var(--text-muted);

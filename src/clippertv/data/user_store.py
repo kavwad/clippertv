@@ -161,6 +161,20 @@ class UserStore:
         )
         self.client.commit()
 
+    def update_display_categories(
+        self, user_id: str, categories: list[str] | None
+    ) -> None:
+        """Update the user's display category preferences."""
+        import json
+
+        val = json.dumps(categories) if categories else None
+        now = datetime.now().isoformat()
+        self.client.execute(
+            "UPDATE users SET display_categories = ?, updated_at = ? WHERE id = ?",
+            [val, now, user_id],
+        )
+        self.client.commit()
+
     def set_needs_reauth(self, user_id: str, value: bool) -> None:
         """Toggle the needs_reauth flag on a user."""
         self.client.execute(

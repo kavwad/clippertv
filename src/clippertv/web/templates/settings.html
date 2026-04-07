@@ -36,6 +36,31 @@
 </section>
 
 <section class="settings-section">
+    <h2>Dashboard Categories</h2>
+    <p class="text-muted">Choose which transit categories appear on your dashboard. Unselected categories are grouped into "Other".</p>
+
+    <form hx-post="/settings/categories"
+          hx-swap="none"
+          hx-indicator="#categories-spinner"
+          hx-on::after-request="if(event.detail.successful) this.querySelector('.save-status').textContent = 'Saved'">
+        <div class="category-checkboxes">
+            {% for cat in all_categories %}
+            <label class="category-checkbox">
+                <input type="checkbox" name="categories" value="{{ cat }}"
+                       {{ "checked" if cat in selected_categories else "" }}>
+                {{ cat }}
+            </label>
+            {% endfor %}
+        </div>
+        <button type="submit" class="form-button form-button-secondary">
+            Save
+        </button>
+        <span id="categories-spinner" class="htmx-indicator">Saving...</span>
+        <span class="save-status"></span>
+    </form>
+</section>
+
+<section class="settings-section">
     <h2>Account</h2>
     <p class="text-muted">{{ user.email }}</p>
 </section>
