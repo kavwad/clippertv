@@ -14,8 +14,8 @@ fi
 # Auto-format and auto-fix via jj fix (runs ruff format + ruff check --fix)
 jj fix 2>/dev/null
 
-# Only check files Claude changed in the working copy
-CHANGED=$(jj diff --name-only 2>/dev/null | grep '\.py$')
+# Only check files Claude changed in the working copy (skip deleted files)
+CHANGED=$(jj diff --name-only 2>/dev/null | grep '\.py$' | while read -r f; do [ -f "$f" ] && echo "$f"; done)
 if [ -z "$CHANGED" ]; then
   exit 0
 fi

@@ -17,8 +17,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-import tomllib  # noqa: E402
-
 import pandas as pd  # noqa: E402
 import requests  # noqa: E402
 from bs4 import BeautifulSoup  # noqa: E402
@@ -352,12 +350,8 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Download CSV transaction reports from clippercard.com."
     )
-    parser.add_argument(
-        "--email", help="Login email (optional if using --user or --all)"
-    )
-    parser.add_argument(
-        "--password", help="Password (optional if using --user or --all)"
-    )
+    parser.add_argument("--email", help="Login email (for manual one-off use)")
+    parser.add_argument("--password", help="Password (for manual one-off use)")
     parser.add_argument(
         "--output",
         default="downloads",
@@ -394,22 +388,6 @@ def _parse_args() -> argparse.Namespace:
         help="Test run without downloading (validates login only)",
     )
     parser.add_argument(
-        "--user",
-        default="",
-        help="Username from config file (e.g., --user=kaveh)",
-    )
-    parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Download for all users in config file",
-    )
-    parser.add_argument(
-        "--config",
-        default="clipper.toml",
-        dest="config_file",
-        help="Path to Clipper config file (TOML)",
-    )
-    parser.add_argument(
         "--ingest",
         action="store_true",
         dest="ingest",
@@ -425,10 +403,28 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _load_config(path: str) -> dict:
-    """Load TOML config file."""
-    with open(path, "rb") as f:
-        return tomllib.load(f)
+def _load_accounts_from_db() -> list[dict]:
+    """Load accounts from the users table via UserStore."""
+    from clippertv.data.user_store import UserStore
+
+    store = UserStore.from_env()
+    users = store.get_all_users_with_credentials()
+    accounts = []
+    for user in users:
+        creds = store.decrypt_user_credentials(user)
+        if not creds:
+            sys.stderr.write(
+                f"Warning: could not decrypt credentials for {user.email}\n"
+            )
+            continue
+        accounts.append(
+            {
+                "name": user.name or user.email,
+                "email": creds["username"],
+                "password": creds["password"],
+            }
+        )
+    return accounts
 
 
 def main() -> int:
@@ -439,11 +435,6 @@ def main() -> int:
         from clippertv.data.turso_store import TursoStore
         from clippertv.ingest.pipeline import ingest as run_ingest
 
-        try:
-            config_data = _load_config(args.config_file)
-        except Exception as e:
-            sys.stderr.write(f"Error loading config file {args.config_file}: {e}\n")
-            return 2
         store = TursoStore()
 
         for filepath in args.ingest_file:
@@ -464,51 +455,25 @@ def main() -> int:
                 print(f"  {count} new transactions for {acct_num}")
         return 0
 
-    if (
-        (args.user and args.all)
-        or (args.user and (args.email or args.password))
-        or (args.all and (args.email or args.password))
-    ):
-        sys.stderr.write("Cannot use --user, --all, and manual credentials together\n")
-        return 2
-
-    if not args.user and not args.all and not args.email and not args.password:
-        args.all = True
-
-    accounts: list[dict] = []
-    if args.user or args.all:
-        try:
-            config_data = _load_config(args.config_file)
-        except Exception as e:
-            sys.stderr.write(f"Error loading config file {args.config_file}: {e}\n")
-            return 2
-        all_accounts = config_data.get("accounts", [])
-        if args.user:
-            matched = [a for a in all_accounts if a["name"] == args.user]
-            if not matched:
-                names = [a["name"] for a in all_accounts]
-                sys.stderr.write(f"User '{args.user}' not found in config file\n")
-                sys.stderr.write(f"Available: {', '.join(names)}\n")
-                return 2
-            accounts = matched
-        else:
-            accounts = all_accounts
-    else:
+    if args.email or args.password:
         if not args.email or not args.password:
-            sys.stderr.write("Please provide credentials\n")
-            sys.stderr.write(
-                f"Usage: {sys.argv[0]} [--user=name] [--all] OR "
-                "[--email=email --password=password] [options]\n"
-            )
+            sys.stderr.write("Both --email and --password are required\n")
             return 2
         accounts = [
             {
                 "name": "manual",
                 "email": args.email,
                 "password": args.password,
-                "cards": [],
             }
         ]
+    else:
+        accounts = _load_accounts_from_db()
+        if not accounts:
+            sys.stderr.write(
+                "No accounts with credentials in database.\n"
+                "Use --email/--password for manual login.\n"
+            )
+            return 2
 
     start_date = args.start_date
     end_date = args.end_date

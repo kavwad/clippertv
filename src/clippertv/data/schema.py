@@ -54,11 +54,17 @@ def create_tables(conn) -> None:
             name                    TEXT,
             credentials_encrypted   TEXT,
             needs_reauth            INTEGER DEFAULT 0,
+            display_categories      TEXT,
             created_at              TEXT DEFAULT (datetime('now')),
             updated_at              TEXT DEFAULT (datetime('now'))
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS users_email_idx ON users(email)")
+
+    # Backfill display_categories for existing databases
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "display_categories" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN display_categories TEXT")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS clipper_cards (

@@ -15,7 +15,7 @@ from clippertv.analytics.categories import collapse_categories
 from clippertv.analytics.comparison import align_riders
 from clippertv.analytics.pass_costs import apply_pass_costs
 from clippertv.analytics.summary import compute_summary
-from clippertv.config import config, load_display_categories
+from clippertv.config import config
 from clippertv.data.domain import AggregateBucket
 from clippertv.data.models import User
 from clippertv.data.queries import QueryLayer
@@ -27,8 +27,6 @@ templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 RIDER_COLORS = ["#0099CC", "#00A55E", "#FDB813", "#BA0C2F", "#6C6C6C", "#4DD0E1"]
 
-_display_categories: list[str] | None = None
-_display_categories_loaded: bool = False
 _ql: QueryLayer | None = None
 
 
@@ -47,19 +45,11 @@ def _get_user_accounts(user: User) -> list[str]:
     return [c.account_number for c in cards]
 
 
-def _keep_categories() -> list[str] | None:
-    global _display_categories, _display_categories_loaded
-    if not _display_categories_loaded:
-        _display_categories = load_display_categories()
-        _display_categories_loaded = True
-    return _display_categories
-
-
 def _dashboard_context(user: User) -> dict:
     """Build template context for the authenticated user."""
     ql = _get_ql()
     accounts = _get_user_accounts(user)
-    keep = _keep_categories()
+    keep = user.display_categories
     rider = user.name or user.email
 
     if not accounts:
@@ -161,7 +151,7 @@ async def get_trip_data(user: User = Depends(require_auth)):
     """Return trip chart data as JSON for Chart.js."""
     ql = _get_ql()
     accounts = _get_user_accounts(user)
-    keep = _keep_categories()
+    keep = user.display_categories
     buckets = collapse_categories(
         ql.monthly_by_category(accounts, include_manual=True),
         keep=keep,
@@ -174,7 +164,7 @@ async def get_cost_data(user: User = Depends(require_auth)):
     """Return cost chart data as JSON for Chart.js."""
     ql = _get_ql()
     accounts = _get_user_accounts(user)
-    keep = _keep_categories()
+    keep = user.display_categories
 
     buckets = ql.monthly_by_category(accounts, include_manual=True)
     pass_m = ql.pass_months(accounts)
@@ -250,7 +240,7 @@ def _table_context(user: User) -> dict:
     """Build table data for the user's accounts."""
     ql = _get_ql()
     accounts = _get_user_accounts(user)
-    keep = _keep_categories()
+    keep = user.display_categories
     pass_m = ql.pass_months(accounts)
 
     raw_monthly = ql.monthly_by_category(accounts, include_manual=True)

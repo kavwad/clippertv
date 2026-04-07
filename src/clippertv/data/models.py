@@ -17,6 +17,9 @@ class User(BaseModel):
     needs_reauth: bool = Field(
         default=False, description="Set when scheduler detects stale credentials"
     )
+    display_categories: list[str] | None = Field(
+        None, description="Ordered list of transit categories to show on dashboard"
+    )
     created_at: datetime = Field(
         default_factory=datetime.now, description="Account creation timestamp"
     )

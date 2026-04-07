@@ -74,7 +74,6 @@ uv run python migrations/run_migration.py      # run SQL/Python migrations
 ### Configuration (`src/clippertv/config.py`)
 - `AppConfig` - App settings (transit categories, colors)
 - `EnvConfig` - Environment variables (DB, JWT, encryption keys)
-- `load_display_categories()` - Optional display category ordering
 
 ### Identity Model
 Users sign up with a ClipperTV account (email + password). During signup or in settings, they link Clipper cards by providing clippercard.com credentials, which are validated against the Clipper API and stored encrypted. Each user can have multiple cards; the dashboard is scoped to the authenticated user's cards.

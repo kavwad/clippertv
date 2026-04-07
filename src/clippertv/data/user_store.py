@@ -12,11 +12,23 @@ def _parse_dt(val) -> datetime:
     return datetime.fromisoformat(val) if val else datetime.now()
 
 
+def _parse_display_categories(val) -> list[str] | None:
+    if not val:
+        return None
+    import json
+
+    try:
+        cats = json.loads(val)
+        return cats if isinstance(cats, list) else None
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
 def _row_to_user(row) -> User:
     """Map a row from the full user SELECT to a User model.
 
     Expected columns: id, email, name, credentials_encrypted,
-    needs_reauth, created_at, updated_at
+    needs_reauth, display_categories, created_at, updated_at
     """
     return User(
         id=row[0],
@@ -24,13 +36,15 @@ def _row_to_user(row) -> User:
         name=row[2],
         credentials_encrypted=row[3],
         needs_reauth=bool(row[4]),
-        created_at=_parse_dt(row[5]),
-        updated_at=_parse_dt(row[6]),
+        display_categories=_parse_display_categories(row[5]),
+        created_at=_parse_dt(row[6]),
+        updated_at=_parse_dt(row[7]),
     )
 
 
 _USER_COLUMNS = (
-    "id, email, name, credentials_encrypted, needs_reauth, created_at, updated_at"
+    "id, email, name, credentials_encrypted, needs_reauth,"
+    " display_categories, created_at, updated_at"
 )
 
 

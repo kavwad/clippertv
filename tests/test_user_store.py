@@ -6,7 +6,7 @@ import pytest
 
 from clippertv.auth.crypto import CredentialEncryption
 from clippertv.auth.service import AuthService
-from clippertv.data.turso_client import get_turso_client
+from clippertv.data.turso_client import get_turso_client, initialize_database
 from clippertv.data.user_store import UserStore
 
 
@@ -15,6 +15,7 @@ def db_client():
     """Get database client for testing."""
     try:
         client = get_turso_client()
+        initialize_database()
         return client
     except Exception as e:
         pytest.skip(f"Database not available: {e}")

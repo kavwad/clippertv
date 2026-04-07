@@ -5,8 +5,7 @@
 #
 # Requires:
 #   - uv (https://docs.astral.sh/uv/)
-#   - clipper.toml in REPO_DIR with account credentials
-#   - .env in REPO_DIR with TURSO_DATABASE_URL / TURSO_AUTH_TOKEN
+#   - .env in REPO_DIR with TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, ENCRYPTION_KEY
 
 set -euo pipefail
 

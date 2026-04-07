@@ -10,7 +10,6 @@ import argparse
 import math
 import random
 import sys
-import tomllib
 from pathlib import Path
 
 # Allow imports from src/
@@ -30,30 +29,6 @@ BACKUP_PATH = PROJECT_ROOT / "backups" / "full_backup_trips.csv"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _load_rider_to_account() -> dict[str, str]:
-    """Build mapping from legacy rider_id aliases/cards to account numbers.
-
-    Only maps non-account identifiers (aliases like "K", card numbers like
-    "1202425091") to the first account number. Actual account numbers are
-    NOT remapped — they pass through as-is to preserve card-level identity.
-    """
-    toml_path = PROJECT_ROOT / "clipper.toml"
-    if not toml_path.exists():
-        return {}
-    with open(toml_path, "rb") as f:
-        data = tomllib.load(f)
-    mapping: dict[str, str] = {}
-    for account in data.get("accounts", []):
-        canonical = account.get("accounts", [None])[0]
-        if not canonical:
-            continue
-        # Only map aliases and card numbers — NOT account numbers
-        for key in ("cards", "aliases"):
-            for val in account.get(key, []):
-                mapping[val] = canonical
-    return mapping
 
 
 def _table_exists(conn, name: str) -> bool:
@@ -279,7 +254,7 @@ def step4_migrate_manual(conn, mapping: dict[str, str]) -> int:
         print(f"  Found {len(mt_rows)} rows in manual_trips table (cols: {col_names})")
 
         for row in mt_rows:
-            rd = dict(zip(col_names, row))
+            rd = dict(zip(col_names, row, strict=False))
             rider_id = rd.get("rider_id") or rd.get("account_number") or ""
             account = _resolve(rider_id, mapping)
             txn_date = rd.get("start_datetime") or rd.get("transaction_date") or ""
@@ -493,12 +468,15 @@ def step6_verify(conn, mapping: dict[str, str]) -> None:
 
         new_fare, new_op = new_row
         # Fare tolerance check (both could be None for reloads etc.)
-        if expected_fare is not None and new_fare is not None:
-            if not math.isclose(expected_fare, new_fare, abs_tol=0.01):
-                sys.exit(
-                    f"ABORT: Spot-check fare mismatch for old id={row_id}: "
-                    f"expected={expected_fare}, got={new_fare}"
-                )
+        if (
+            expected_fare is not None
+            and new_fare is not None
+            and not math.isclose(expected_fare, new_fare, abs_tol=0.01)
+        ):
+            sys.exit(
+                f"ABORT: Spot-check fare mismatch for old id={row_id}: "
+                f"expected={expected_fare}, got={new_fare}"
+            )
         if not new_op:
             sys.exit(f"ABORT: Spot-check operator empty for old id={row_id}")
         print(f"    id={row_id} ({source}): OK (fare={new_fare}, operator={new_op})")
@@ -569,8 +547,8 @@ def main() -> None:
     args = parser.parse_args()
 
     conn = get_turso_client()
-    mapping = _load_rider_to_account()
-    print(f"Loaded {len(mapping)} rider->account mappings")
+    mapping: dict[str, str] = {}
+    print("Rider->account mapping from toml removed; using empty mapping")
 
     step0_verify_backups()
     step1_create_new_tables(conn)

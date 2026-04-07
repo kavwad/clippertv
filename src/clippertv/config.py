@@ -2,8 +2,6 @@
 
 import hashlib
 import os
-import tomllib
-from pathlib import Path
 
 from pydantic import BaseModel
 
@@ -137,15 +135,3 @@ class EnvConfig:
 
 
 env_config = EnvConfig()
-
-
-def load_display_categories(config_path: str = "clipper.toml") -> list[str] | None:
-    """Load explicit display categories from clipper.toml, if configured."""
-    path = Path(config_path)
-    if not path.exists():
-        return None
-    with open(path, "rb") as f:
-        data = tomllib.load(f)
-    display = data.get("display", {})
-    cats = display.get("categories")
-    return list(cats) if cats else None
