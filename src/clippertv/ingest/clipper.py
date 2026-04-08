@@ -7,6 +7,7 @@ normalized DataFrames.
 """
 
 import argparse
+import logging
 import os
 import sys
 import time
@@ -20,6 +21,8 @@ load_dotenv()
 import pandas as pd  # noqa: E402
 import requests  # noqa: E402
 from bs4 import BeautifulSoup  # noqa: E402
+
+log = logging.getLogger(__name__)
 
 HOST = "https://www.clippercard.com"
 USER_AGENT = "clipper-downloader/0.3"
@@ -118,6 +121,7 @@ def login(session: requests.Session, email: str, password: str) -> requests.Sess
     resp = session.get(
         f"{HOST}/web-login",
         headers={"User-Agent": USER_AGENT},
+        timeout=30,
     )
     if resp.status_code != 200:
         raise RuntimeError(f"Could not get login page: {resp.status_code}")
@@ -137,6 +141,7 @@ def login(session: requests.Session, email: str, password: str) -> requests.Sess
             "User-Agent": USER_AGENT,
             "Referer": f"{HOST}/web-login",
         },
+        timeout=30,
     )
     if resp2.status_code not in (200, 302):
         raise RuntimeError(f"Could not login: {resp2.status_code}")
@@ -237,17 +242,38 @@ def download_csv(
 
     max_retries = 3
     for attempt in range(max_retries):
-        resp = session.post(
-            f"{HOST}/download-trip-history/CSV",
-            json=payload,
-            headers=headers,
-        )
+        try:
+            resp = session.post(
+                f"{HOST}/download-trip-history/CSV",
+                json=payload,
+                headers=headers,
+                timeout=60,
+            )
+        except (requests.ConnectionError, requests.Timeout) as e:
+            if attempt < max_retries - 1:
+                wait = 2**attempt * 2
+                log.warning(
+                    "Connection error on attempt %d/%d: %s. Retrying in %ds...",
+                    attempt + 1,
+                    max_retries,
+                    e,
+                    wait,
+                )
+                time.sleep(wait)
+                continue
+            raise
 
         is_server_error = resp.status_code >= 500
         is_transient_404 = resp.status_code == 404 and "50x.html" in resp.text
         if (is_server_error or is_transient_404) and attempt < max_retries - 1:
-            wait = 2**attempt
-            print(f"Server error ({resp.status_code}), retrying in {wait}s...")
+            wait = 2**attempt * 2
+            log.warning(
+                "Server error (%d) on attempt %d/%d. Retrying in %ds...",
+                resp.status_code,
+                attempt + 1,
+                max_retries,
+                wait,
+            )
             time.sleep(wait)
             continue
 

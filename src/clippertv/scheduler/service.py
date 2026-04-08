@@ -12,6 +12,8 @@ import sys
 from dataclasses import dataclass
 from datetime import date, timedelta
 
+import requests
+
 from clippertv.ingest.clipper import (
     download_transactions,
     login,
@@ -56,8 +58,6 @@ def run_ingestion(
     Returns:
         Per-account results with row counts or errors.
     """
-    import requests
-
     from clippertv.data.turso_store import TursoStore
 
     store = _build_user_store()
@@ -89,9 +89,16 @@ def run_ingestion(
             downloads = download_transactions(
                 session, output_dir, start_date, end_date, dry_run
             )
+        except (requests.ConnectionError, requests.Timeout) as e:
+            log.error("Transient network error for %s: %s", email, e)
+            results.append(IngestionResult(account=email, new_rows=0, error=str(e)))
+            continue
         except Exception as e:
             log.error("Download failed for %s: %s", email, e)
-            store.set_needs_reauth(user.id, True)
+            try:
+                store.set_needs_reauth(user.id, True)
+            except Exception:
+                log.exception("Failed to set needs_reauth for user %s", user.id)
             results.append(IngestionResult(account=email, new_rows=0, error=str(e)))
             continue
 
