@@ -86,7 +86,7 @@ class CookieAuthBackend(AuthenticationBackend):
 def require_auth(request: Request) -> User:
     """FastAPI dependency — returns User or redirects to /login."""
     if request.user.is_authenticated:
-        return request.user.user  # type: ignore[union-attr]
+        return request.user.user
 
     if request.headers.get("HX-Request"):
         raise _htmx_login_redirect()

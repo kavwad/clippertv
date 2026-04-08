@@ -18,7 +18,7 @@ from clippertv.web.settings_routes import router as settings_router  # noqa: E40
 app = FastAPI(title="ClipperTV", description="Transit trip dashboard")
 
 # Authentication middleware — populates request.user on every request
-app.add_middleware(AuthenticationMiddleware, backend=CookieAuthBackend())
+app.add_middleware(AuthenticationMiddleware, backend=CookieAuthBackend())  # type: ignore[arg-type]
 
 # Exception handlers for auth redirects
 for exc_class, handler in auth_exception_handlers().items():
