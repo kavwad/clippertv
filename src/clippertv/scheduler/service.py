@@ -102,6 +102,11 @@ def run_ingestion(
             results.append(IngestionResult(account=email, new_rows=0, error=str(e)))
             continue
 
+        # Login + download succeeded, so the stored credentials are valid.
+        # Clear any stale reauth flag left by a past transient failure.
+        if user.needs_reauth:
+            store.set_needs_reauth(user.id, False)
+
         if dry_run:
             results.append(IngestionResult(account=email, new_rows=0))
             continue
