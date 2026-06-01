@@ -33,8 +33,12 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"clippertv.web" = ["templates/**/*.html", "static/*"]
+
 [dependency-groups]
 dev = [
+    "modal>=1.4.3",
     "pytest>=8.4.2",
     "ruff>=0.15.7",
     "ty>=0.0.24",
