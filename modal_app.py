@@ -20,12 +20,17 @@ import modal
 
 app = modal.App("clippertv")
 
-# Build the image straight from pyproject.toml + uv.lock. uv_sync installs the
-# clippertv project too, so the web templates/static (declared as package-data
-# in pyproject.toml) land in site-packages where Path(__file__).parent expects
-# them. If a spike shows assets missing, fall back to add_local_dir for
-# src/clippertv/web/{templates,static}.
-image = modal.Image.debian_slim(python_version="3.13").uv_sync()
+# uv_sync installs the dependencies from pyproject.toml + uv.lock, but not the
+# local clippertv project itself. We mount the src/ tree and put it on
+# PYTHONPATH: this makes `import clippertv` work and carries the non-Python web
+# assets (templates/static) inline, so Path(__file__).parent resolves correctly.
+# (.env must precede the local-dir mount — copy=False mounts are applied last.)
+image = (
+    modal.Image.debian_slim(python_version="3.13")
+    .uv_sync()
+    .env({"PYTHONPATH": "/root/src"})
+    .add_local_dir("src", "/root/src")
+)
 
 clippertv_secret = modal.Secret.from_name("clippertv")
 
