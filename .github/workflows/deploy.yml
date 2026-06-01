@@ -1,0 +1,37 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+
+# Least privilege: this workflow only reads the repo and deploys to Modal.
+permissions:
+  contents: read
+
+concurrency:
+  group: modal-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Modal
+    runs-on: ubuntu-latest
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # Only the Modal client is needed locally; the image (deps via uv_sync)
+      # and the clippertv source are built/uploaded remotely at deploy time.
+      - name: Install Modal
+        run: pip install modal
+
+      - name: Deploy
+        run: modal deploy modal_app.py
