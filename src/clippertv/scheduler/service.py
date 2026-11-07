@@ -1,8 +1,8 @@
 """Scheduled ingestion service.
 
 Loads Clipper credentials from the users table, downloads recent
-transactions, and ingests them. Can be triggered by launchd,
-systemd, cron, Railway cron, or any other scheduler.
+transactions, and ingests them. In production it is triggered by the
+Modal cron in ``modal_app.py``; any other scheduler can call it too.
 """
 
 from __future__ import annotations

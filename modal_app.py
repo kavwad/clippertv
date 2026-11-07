@@ -5,7 +5,7 @@ portable ``clippertv`` package; this file just wires two workloads onto Modal:
 
 - ``web``   — the FastAPI dashboard as a scale-to-zero ASGI app.
 - ``ingest`` — the monthly Clipper ingestion as a native scheduled function
-              (replaces the old launchd plist + shell wrapper + Railway cron).
+              (replaced the old launchd plist + shell wrapper + Railway cron).
 
 Deploy:   uv run modal deploy -m modal_app
 Spike:    uv run modal run modal_app.py::ingest    # one-off ingest, no schedule
