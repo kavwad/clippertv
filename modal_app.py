@@ -59,7 +59,9 @@ def web():
     # NOTE: when a staging environment is added later, gate this schedule so a
     # staging deploy does not double-ingest into the shared Turso DB.
     schedule=modal.Cron("0 8 1 * *", timezone="America/Los_Angeles"),
-    timeout=600,
+    # Generous ceiling: accounts run serially, each 65-day pull is three CSV
+    # requests with up to 3x60s retries, and Modal bills only actual runtime.
+    timeout=3600,
 )
 def ingest():
     from clippertv.scheduler.service import run_ingestion
