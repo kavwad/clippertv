@@ -4,8 +4,8 @@ The only Modal-specific module in the repo. Everything it needs lives in the
 portable ``clippertv`` package; this file just wires two workloads onto Modal:
 
 - ``web``   — the FastAPI dashboard as a scale-to-zero ASGI app.
-- ``ingest`` — the weekly Clipper ingestion as a native scheduled function
-              (replaces the old launchd plist + shell wrapper + Railway cron).
+- ``ingest`` — the monthly Clipper ingestion as a native scheduled function
+              (replaced the old launchd plist + shell wrapper + Railway cron).
 
 Deploy:   uv run modal deploy -m modal_app
 Spike:    uv run modal run modal_app.py::ingest    # one-off ingest, no schedule
@@ -53,18 +53,22 @@ def web():
 @app.function(
     image=image,
     secrets=[clippertv_secret],
-    # Matches the old launchd schedule: Mondays at 08:00 Pacific.
+    # Monthly: 08:00 Pacific on the 1st. The 65-day lookback (below) covers the
+    # previous two months, so if one run fails (or one account errors) the next
+    # run still backfills the missed month; trip_id dedup absorbs the overlap.
     # NOTE: when a staging environment is added later, gate this schedule so a
     # staging deploy does not double-ingest into the shared Turso DB.
-    schedule=modal.Cron("0 8 * * 1", timezone="America/Los_Angeles"),
-    timeout=600,
+    schedule=modal.Cron("0 8 1 * *", timezone="America/Los_Angeles"),
+    # Generous ceiling: accounts run serially, each 65-day pull is three CSV
+    # requests with up to 3x60s retries, and Modal bills only actual runtime.
+    timeout=3600,
 )
 def ingest():
     from clippertv.scheduler.service import run_ingestion
 
     healthcheck = os.environ.get("HEALTHCHECK_URL")
     try:
-        results = run_ingestion(days=30, output_dir="/tmp/downloads")
+        results = run_ingestion(days=65, output_dir="/tmp/downloads")
     except Exception:
         _ping(healthcheck, "/fail")
         raise

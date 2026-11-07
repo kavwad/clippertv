@@ -10,8 +10,8 @@ uv run uvicorn clippertv.web.main:app --reload --host 0.0.0.0
 clipper-download --last-month --ingest
 clipper-download --days 14 --ingest    # Rolling window
 
-# Scheduled ingestion (all accounts, last 30 days)
-uv run clippertv-ingest --days 30 -v
+# Scheduled ingestion (all accounts, last 65 days; Modal runs it monthly on the 1st)
+uv run clippertv-ingest --days 65 -v
 
 # Tests
 uv run pytest                        # All tests
@@ -41,7 +41,7 @@ uv run python migrations/run_migration.py      # run SQL/Python migrations
 ### Scheduler (`src/clippertv/scheduler/`)
 - `service.py` - Platform-agnostic ingestion runner (`run_ingestion()`, `clippertv-ingest` CLI); reads Clipper credentials from DB
 - `__main__.py` - `python -m clippertv.scheduler` support
-- `scheduler/` (repo root) - launchd plist + shell wrapper (platform glue)
+- Production schedule lives in `modal_app.py` (Modal cron, 08:00 PT on the 1st)
 
 ### Data Layer (`src/clippertv/data/`)
 - `domain.py` - Typed dataclasses (Trip, AggregateBucket, RiderSummary, ComparisonPoint)

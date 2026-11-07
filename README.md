@@ -7,7 +7,7 @@ Transit dashboard for Bay Area Clipper card riders. Download your transaction hi
 - **CSV ingestion** from clippercard.com API with automatic categorization
 - **Interactive dashboard** with Chart.js visualizations and HTMX interactions
 - **Multi-user auth** with per-user Clipper card management
-- **Scheduled ingestion** via launchd or CLI
+- **Scheduled ingestion** monthly on Modal (or on demand via CLI)
 
 ## Quick Start
 
@@ -25,7 +25,7 @@ uv run uvicorn clippertv.web.main:app --reload --host 0.0.0.0
 clipper-download --last-month --ingest
 
 # Scheduled ingestion (all accounts, last 30 days)
-uv run clippertv-ingest --days 30 -v
+uv run clippertv-ingest --days 65 -v
 ```
 
 ## Project Structure
@@ -41,7 +41,6 @@ clippertv/
 │   ├── web/               # FastAPI app, auth middleware, routes, templates
 │   └── config.py          # App and environment config
 ├── migrations/            # SQL and Python database migrations
-├── scheduler/             # launchd plist + shell wrapper
 ├── tests/                 # Test suite
 └── .env                   # Environment configuration
 ```
