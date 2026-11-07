@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 from collections import defaultdict
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 
@@ -177,23 +178,23 @@ async def get_cost_data(user: User = Depends(require_auth)):
 async def get_comparison_data(user: User = Depends(require_auth)):
     """Return comparison chart data as JSON for Chart.js.
 
-    Compares the authenticated user's cards grouped by rider_name.
+    Compares monthly trip totals across users, each user's line summing all
+    of their linked cards. The authenticated user is listed first.
     """
     ql = _get_ql()
     store = get_user_store()
-    cards = store.get_user_clipper_cards(user.id)
-    if not cards:
+    user_accounts = store.get_accounts_by_user()
+    if not user_accounts:
         return {"labels": [], "datasets": []}
 
-    # Group cards by rider_name for comparison
-    rider_accounts: dict[str, list[str]] = defaultdict(list)
-    for card in cards:
-        rider_accounts[card.rider_name].append(card.account_number)
+    # Current user first, then everyone else in signup order
+    user_accounts.sort(key=lambda pair: pair[0].id != user.id)
 
-    rider_names = list(rider_accounts.keys())
     rider_counts: dict[str, list[tuple[str, int]]] = {}
-    for name in rider_names:
-        rider_counts[name] = ql.monthly_trip_counts(rider_accounts[name])
+    for rider_user, accounts in user_accounts:
+        rider_counts[_rider_label(rider_user, rider_counts)] = (
+            ql.monthly_trip_counts(accounts)
+        )
 
     points = align_riders(rider_counts)
     if not points:
@@ -203,7 +204,7 @@ async def get_comparison_data(user: User = Depends(require_auth)):
     labels = [_format_period(p) for p in periods]
     datasets = []
 
-    for i, name in enumerate(rider_names):
+    for i, name in enumerate(rider_counts):
         color = RIDER_COLORS[i % len(RIDER_COLORS)]
         rider_points = {p.period: p.count for p in points if p.rider_name == name}
         datasets.append(
@@ -266,6 +267,19 @@ def _table_context(user: User) -> dict:
 
 
 # --- Helpers ---
+
+
+def _rider_label(user: User, taken: Iterable[str]) -> str:
+    """Display label for a user: name, else capitalized email local part.
+
+    Falls back to the full email if the short label is already taken.
+    """
+    if user.name:
+        label = user.name
+    else:
+        local = user.email.split("@", 1)[0]
+        label = local.capitalize() if local.isalpha() else local
+    return user.email if label in taken else label
 
 
 def _format_period(period: str) -> str:

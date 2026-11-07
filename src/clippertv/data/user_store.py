@@ -249,6 +249,27 @@ class UserStore:
         )
         return [_row_to_card(row) for row in result.fetchall()]
 
+    def get_accounts_by_user(self) -> list[tuple[User, list[str]]]:
+        """Return every user with linked cards, paired with their account numbers.
+
+        Users are ordered by signup date; users without cards are omitted.
+        """
+        result = self.client.execute(
+            "SELECT c.user_id, c.account_number FROM clipper_cards c"
+            " JOIN users u ON u.id = c.user_id"
+            " ORDER BY u.created_at ASC, c.created_at ASC",
+        )
+        accounts: dict[str, list[str]] = {}
+        for user_id, account_number in result.fetchall():
+            accounts.setdefault(user_id, []).append(account_number)
+
+        pairs = []
+        for user_id, account_numbers in accounts.items():
+            user = self.get_user_by_id(user_id)
+            if user is not None:
+                pairs.append((user, account_numbers))
+        return pairs
+
     def update_card_rider_name(self, card_id: str, rider_name: str) -> None:
         """Rename a Clipper card."""
         self.client.execute(

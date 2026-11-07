@@ -212,3 +212,15 @@ class TestClipperCardStore:
 
         cards = user_store.get_user_clipper_cards(user.id)
         assert cards == []
+
+    def test_get_accounts_by_user(self, user_store):
+        """Each user's cards are grouped together; card-less users are omitted."""
+        kaveh = user_store.create_user(_unique_email("kaveh"), "password123")
+        bree = user_store.create_user(_unique_email("bree"), "password123")
+        user_store.create_user(_unique_email("nocards"), "password123")
+        user_store.discover_and_sync_cards(kaveh.id, ["111", "222"])
+        user_store.discover_and_sync_cards(bree.id, ["333"])
+
+        result = {u.id: accts for u, accts in user_store.get_accounts_by_user()}
+
+        assert result == {kaveh.id: ["111", "222"], bree.id: ["333"]}
