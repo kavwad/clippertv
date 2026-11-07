@@ -4,7 +4,7 @@ The only Modal-specific module in the repo. Everything it needs lives in the
 portable ``clippertv`` package; this file just wires two workloads onto Modal:
 
 - ``web``   — the FastAPI dashboard as a scale-to-zero ASGI app.
-- ``ingest`` — the weekly Clipper ingestion as a native scheduled function
+- ``ingest`` — the monthly Clipper ingestion as a native scheduled function
               (replaces the old launchd plist + shell wrapper + Railway cron).
 
 Deploy:   uv run modal deploy -m modal_app
@@ -53,10 +53,12 @@ def web():
 @app.function(
     image=image,
     secrets=[clippertv_secret],
-    # Matches the old launchd schedule: Mondays at 08:00 Pacific.
+    # Monthly: 08:00 Pacific on the 1st. The 35-day lookback (below) covers the
+    # whole previous month even after 31-day months; trip_id dedup absorbs the
+    # overlap.
     # NOTE: when a staging environment is added later, gate this schedule so a
     # staging deploy does not double-ingest into the shared Turso DB.
-    schedule=modal.Cron("0 8 * * 1", timezone="America/Los_Angeles"),
+    schedule=modal.Cron("0 8 1 * *", timezone="America/Los_Angeles"),
     timeout=600,
 )
 def ingest():
@@ -64,7 +66,7 @@ def ingest():
 
     healthcheck = os.environ.get("HEALTHCHECK_URL")
     try:
-        results = run_ingestion(days=30, output_dir="/tmp/downloads")
+        results = run_ingestion(days=35, output_dir="/tmp/downloads")
     except Exception:
         _ping(healthcheck, "/fail")
         raise

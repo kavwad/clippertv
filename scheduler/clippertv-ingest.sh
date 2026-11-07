@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Weekly Clipper CSV ingestion wrapper for launchd.
+# Monthly Clipper CSV ingestion wrapper for launchd.
 #
 # Usage: ./clippertv-ingest.sh [--dry-run]
 #
@@ -29,7 +29,7 @@ if [[ "${1:-}" == "--dry-run" ]]; then
     log "Dry-run mode"
 fi
 
-uv run clippertv-ingest --days 30 "${EXTRA_ARGS[@]}" -v 2>&1 | tee -a "$LOG_FILE"
+uv run clippertv-ingest --days 35 "${EXTRA_ARGS[@]}" -v 2>&1 | tee -a "$LOG_FILE"
 EXIT_CODE=${PIPESTATUS[0]}
 
 if [[ $EXIT_CODE -eq 0 ]]; then

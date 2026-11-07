@@ -1,4 +1,8 @@
-# Scheduler: Weekly Clipper Ingestion
+# Scheduler: Monthly Clipper Ingestion
+
+> **Production runs on Modal** (`modal_app.py`, 08:00 Pacific on the 1st of each
+> month). The launchd/cron setup below is only for running it locally instead —
+> don't run both.
 
 Platform-agnostic Python module (`clippertv.scheduler`) with a thin
 platform-specific trigger layer.
@@ -22,13 +26,13 @@ are platform glue — swap them when moving to a Pi or cloud.
 
 ```bash
 # Run directly
-uv run clippertv-ingest --days 30 -v
+uv run clippertv-ingest --days 35 -v
 
 # Dry run (validate logins)
 uv run clippertv-ingest --dry-run
 
 # Or as a module
-uv run python -m clippertv.scheduler --days 30
+uv run python -m clippertv.scheduler --days 35
 ```
 
 ## macOS Setup (launchd)
@@ -62,7 +66,7 @@ Create a systemd timer pointing at the same script, or call
 `clippertv-ingest` directly from cron:
 
 ```cron
-0 9 * * 0  cd /path/to/clippertv && uv run clippertv-ingest --days 30 -v >> logs/cron.log 2>&1
+0 8 1 * *  cd /path/to/clippertv && uv run clippertv-ingest --days 35 -v >> logs/cron.log 2>&1
 ```
 
 ## Uninstall (macOS)

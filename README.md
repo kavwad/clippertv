@@ -25,7 +25,7 @@ uv run uvicorn clippertv.web.main:app --reload --host 0.0.0.0
 clipper-download --last-month --ingest
 
 # Scheduled ingestion (all accounts, last 30 days)
-uv run clippertv-ingest --days 30 -v
+uv run clippertv-ingest --days 35 -v
 ```
 
 ## Project Structure
