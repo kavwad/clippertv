@@ -192,8 +192,8 @@ async def get_comparison_data(user: User = Depends(require_auth)):
 
     rider_counts: dict[str, list[tuple[str, int]]] = {}
     for rider_user, accounts in user_accounts:
-        rider_counts[_rider_label(rider_user, rider_counts)] = (
-            ql.monthly_trip_counts(accounts)
+        rider_counts[_rider_label(rider_user, rider_counts)] = ql.monthly_trip_counts(
+            accounts, include_manual=True
         )
 
     points = align_riders(rider_counts)

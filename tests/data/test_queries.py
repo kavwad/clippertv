@@ -173,3 +173,14 @@ def test_load_trips(ql):
 def test_most_recent_date(ql):
     result = ql.most_recent_date(["A"])
     assert result == "2026-03-01"
+
+
+def test_monthly_trip_counts_include_manual(ql):
+    ql.conn.execute(
+        "INSERT INTO manual_trips (account_number, start_datetime, operator)"
+        " VALUES ('A', '2026-02-20T08:00:00', 'Caltrain')"
+    )
+    without = dict(ql.monthly_trip_counts(["A"]))
+    with_manual = dict(ql.monthly_trip_counts(["A"], include_manual=True))
+    assert without["2026-02"] == 4
+    assert with_manual["2026-02"] == 5

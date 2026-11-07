@@ -95,17 +95,22 @@ class QueryLayer:
         rows = self.conn.execute(query, account_numbers * 2).fetchall()
         return {r[0] for r in rows}
 
-    def monthly_trip_counts(self, account_numbers: list[str]) -> list[tuple[str, int]]:
+    def monthly_trip_counts(
+        self,
+        account_numbers: list[str],
+        *,
+        include_manual: bool = False,
+    ) -> list[tuple[str, int]]:
         """Monthly total trip counts (all categories combined). For comparison chart."""
-        ph = _placeholders(len(account_numbers))
+        source = self._source_clause(account_numbers, include_manual)
         query = f"""
             SELECT strftime('%Y-%m', start_datetime) AS period, COUNT(*) AS count
-            FROM trips
-            WHERE account_number IN ({ph})
+            FROM ({source})
             GROUP BY period
             ORDER BY period
         """
-        rows = self.conn.execute(query, account_numbers).fetchall()
+        params = account_numbers * (2 if include_manual else 1)
+        rows = self.conn.execute(query, params).fetchall()
         return [(r[0], r[1]) for r in rows]
 
     def load_trips(self, account_numbers: list[str]) -> list[Trip]:
