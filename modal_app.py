@@ -53,9 +53,9 @@ def web():
 @app.function(
     image=image,
     secrets=[clippertv_secret],
-    # Monthly: 08:00 Pacific on the 1st. The 35-day lookback (below) covers the
-    # whole previous month even after 31-day months; trip_id dedup absorbs the
-    # overlap.
+    # Monthly: 08:00 Pacific on the 1st. The 65-day lookback (below) covers the
+    # previous two months, so if one run fails (or one account errors) the next
+    # run still backfills the missed month; trip_id dedup absorbs the overlap.
     # NOTE: when a staging environment is added later, gate this schedule so a
     # staging deploy does not double-ingest into the shared Turso DB.
     schedule=modal.Cron("0 8 1 * *", timezone="America/Los_Angeles"),
@@ -66,7 +66,7 @@ def ingest():
 
     healthcheck = os.environ.get("HEALTHCHECK_URL")
     try:
-        results = run_ingestion(days=35, output_dir="/tmp/downloads")
+        results = run_ingestion(days=65, output_dir="/tmp/downloads")
     except Exception:
         _ping(healthcheck, "/fail")
         raise

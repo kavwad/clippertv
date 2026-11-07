@@ -10,8 +10,8 @@ uv run uvicorn clippertv.web.main:app --reload --host 0.0.0.0
 clipper-download --last-month --ingest
 clipper-download --days 14 --ingest    # Rolling window
 
-# Scheduled ingestion (all accounts, last 35 days; Modal runs it monthly on the 1st)
-uv run clippertv-ingest --days 35 -v
+# Scheduled ingestion (all accounts, last 65 days; Modal runs it monthly on the 1st)
+uv run clippertv-ingest --days 65 -v
 
 # Tests
 uv run pytest                        # All tests
